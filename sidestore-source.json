@@ -1,0 +1,24 @@
+{
+  "name": "Veyra",
+  "identifier": "com.thedevstars.veyra.source",
+  "apps": [
+    {
+      "name": "Veyra Browser",
+      "bundleIdentifier": "com.thedevstars.veyra",
+      "developerName": "theDevstars",
+      "subtitle": "A customizable browser for your devices.",
+      "localizedDescription": "Veyra is a customizable browser project. Installable builds will appear here after a successful signed or SideStore-compatible release.",
+      "iconURL": "https://raw.githubusercontent.com/theDevstars/veyra-browser/main/assets/icon.png",
+      "tintColor": "#7867F7",
+      "category": "utilities",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-29T00:00:00Z",
+          "downloadURL": "https://github.com/theDevstars/veyra-browser/releases/latest/download/Veyra.ipa",
+          "size": 0
+        }
+      ]
+    }
+  ]
+}

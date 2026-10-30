@@ -4,45 +4,48 @@ Last reviewed: 2026-10-29
 
 ## Project identity
 - Repository: https://github.com/theDevstars/veyra-browser
-- Default branch: `main`
+- Default branch: main
 - App name: Veyra Browser
-- iOS bundle ID target: `com.thedevstars.veyra`
-- Android application ID target: `com.thedevstars.veyra`
+- iOS bundle ID: com.thedevstars.veyra
+- Android application ID: com.thedevstars.veyra
 
-## Expo removal / standalone migration
-The project is being converted from Expo-managed tooling to a standalone React Native CLI setup. Expo dependencies, Expo app configuration, Expo scripts, and Expo-based CI commands are being removed.
+## Build system
+Expo has been restored as Veyra's React Native development and build toolkit. The finished app remains branded Veyra; Expo Go is optional for previewing and is not required for EAS production builds.
 
-The root app currently imports only React Native primitives and `react-native-webview`, so the starter UI itself does not require Expo APIs. Standalone entry points and Metro/Babel/Vite configuration have been added. Native project scaffolding is a separate remaining step.
+- Expo SDK dependency and Expo entry point restored in package.json.
+- Expo app configuration restored in app.json.
+- Expo Babel and Metro configuration added.
+- EAS Build profiles added in eas.json.
+- Web export and Windows Electron packaging switched to Expo's Metro web export.
 
-## Current repository implementation
-- Root `App.js`: small React Native browser starter with address entry and WebView.
-- `desktop/`: Electron shell for Windows.
-- `sidestore-source.json`: Veyra SideStore source metadata; its app version list is empty.
-- `assets/veyra-icon.svg`: Veyra icon source.
+## Current implementation
+- Root App.js: small React Native browser starter with address entry and WebView.
+- desktop/: Electron shell for Windows.
+- sidestore-source.json: Veyra SideStore source metadata; its app version list is empty.
+- assets/veyra-icon.svg: Veyra icon source.
 
 ## Platform status
-- Web: Vite + React Native Web build configuration is being introduced.
-- Windows: Electron packages the web build.
-- iOS: native React Native CLI Xcode project is not yet present.
-- Android: native React Native CLI Gradle project is not yet present.
+- Web: Expo web export is configured in GitHub Actions; build still needs to run and pass.
+- Windows: Electron installer workflow is configured to package the Expo web export; build still needs to run and pass.
+- iOS: EAS preview/production profiles are configured; no IPA has been built or published yet.
+- Android: EAS preview/production profiles are configured; no APK/AAB has been built or published yet.
 - SideStore: no installable IPA is published.
 
-## Build workflow
-Workflow: `.github/workflows/build.yml`
+## CI
+Workflow: .github/workflows/build.yml
 
-The workflow now builds the web app and Windows installer only, using Vite and Electron. iOS and Android jobs must be restored after the native `ios/` and `android/` project folders are generated, committed, and validated.
+The workflow exports the Expo web app and packages the Windows installer. Automated EAS builds from GitHub Actions require an EXPO_TOKEN repository secret; local EAS commands are documented in the README.
 
 ## Imported source archive reviewed
-The supplied `Laturenapp-main 2.zip` was inspected. It contains an older, much fuller mobile app and desktop source, but those older app sources have not yet been merged into this Veyra repository. The uploaded mobile source used Expo modules and needs a deliberate migration before it can replace the current starter.
+The supplied Laturenapp-main 2.zip was inspected. It contains an older, fuller mobile app and desktop source, but those older app sources have not yet been merged into this Veyra repository. The older mobile source used Expo modules and needs a deliberate merge before it can replace the current starter.
 
 ## Next milestones
-1. Finish standalone React Native CLI setup and verify the Vite web build.
-2. Generate and commit native iOS and Android project folders.
-3. Port the fuller mobile browser implementation without reintroducing Expo.
-4. Verify Android APK and iOS archive/IPA builds.
-5. Configure signing and publish a SideStore-compatible IPA release asset.
-6. Expand the Windows desktop UI and test the installer.
-7. Implement dock navigation, tabs, bookmarks/history, settings categories, privacy controls, and responsive polish.
+1. Run and validate the Expo web export and Windows installer workflow.
+2. Configure EAS credentials and build iOS and Android preview artifacts.
+3. Merge the fuller browser UI and features from the supplied source archive.
+4. Verify privacy controls, tabs, bookmarks, history, and customization on each platform.
+5. Publish a SideStore-compatible IPA release asset and populate the source feed.
+6. Expand and test the Windows desktop experience.
 
 ## Platform notes
 - The Electron wrapper packages the web build as a Windows installer; it is not a native Windows browser engine.

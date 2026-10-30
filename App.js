@@ -5,7 +5,7 @@ import { WebView } from "react-native-webview";
 import Svg, { Path, Circle, Rect } from "react-native-svg";
 
 const PURPLE = "#8170f5";
-const DEFAULTS = { darkMode: true, compactDock: false, blockCookies: false, trackerProtection: true, httpsOnly: false, javascript: true };
+const DEFAULTS = { compactDock: false, blockCookies: false, httpsOnly: false, javascript: true };
 
 function Glyph({ name, color = "#d8d4ef", size = 22 }) {
   const common = { stroke: color, strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", fill: "none" };
@@ -50,7 +50,7 @@ export default function App() {
     const value = raw.trim();
     if (!value) return;
     const hasProtocol = value.startsWith("https://") || value.startsWith("http://");
-    const target = hasProtocol ? value : value.includes(".") && !value.includes(" ") ? (prefs.httpsOnly ? "https://" : "https://") + value : "https://www.google.com/search?q=" + encodeURIComponent(value);
+    const target = hasProtocol ? (prefs.httpsOnly && value.startsWith("http://") ? "https://" + value.slice(7) : value) : value.includes(".") && !value.includes(" ") ? "https://" + value : "https://www.google.com/search?q=" + encodeURIComponent(value);
     Keyboard.dismiss();
     setAddress(target);
     setUrl(target);
@@ -98,8 +98,8 @@ export default function App() {
           {panel === "settings" && <ScrollView contentContainerStyle={s.panelBody}>
             <View style={s.panelHeading}><Pressable onPress={() => settingsSection === "main" ? setPanel("home") : setSettingsSection("main")}><Text style={s.backText}>‹ {settingsSection === "main" ? "Home" : "Settings"}</Text></Pressable><Text style={s.panelTitle}>{settingsSection === "main" ? "Settings" : settingsSection[0].toUpperCase() + settingsSection.slice(1)}</Text></View>
             {settingsSection === "main" ? <>{row("settings", "Customization", "Theme and browser appearance", () => setSettingsSection("customization"))}{row("shield", "Security & privacy", "Cookies, tracking and site controls", () => setSettingsSection("security"))}{row("plus", "Extensions", "Extension support and management", () => setSettingsSection("extensions"))}</> : null}
-            {settingsSection === "customization" && <>{setting("Dark appearance", "Use Veyra's dark theme", "darkMode")}{setting("Compact dock", "Use a smaller bottom toolbar", "compactDock")}</>}
-            {settingsSection === "security" && <>{setting("Limit third-party cookies", "Restricts third-party cookies where the platform WebView supports it", "blockCookies")}{setting("Tracking protection", "Privacy preference is saved; full network-level blocking is not yet available", "trackerProtection")}{setting("HTTPS preference", "Prefer secure HTTPS addresses", "httpsOnly")}{setting("JavaScript", "Allow websites to run JavaScript", "javascript")}</>}
+            {settingsSection === "customization" && <>{setting("Compact dock", "Use a smaller bottom toolbar", "compactDock")}</>}
+            {settingsSection === "security" && <>{setting("Limit third-party cookies", "Restricts third-party cookies where the platform WebView supports it", "blockCookies")}<View style={s.infoCard}><Text style={s.menuTitle}>Tracking protection</Text><Text style={s.menuSub}>Advanced network-level tracker blocking is not active yet. It will be added in a later security update.</Text></View>{setting("HTTPS preference", "Prefer secure HTTPS addresses", "httpsOnly")}{setting("JavaScript", "Allow websites to run JavaScript", "javascript")}</>}
             {settingsSection === "extensions" && <View style={s.infoCard}><Text style={s.menuTitle}>Extensions are coming</Text><Text style={s.menuSub}>The extension manager will be added after the core browser controls are restored.</Text></View>}
           </ScrollView>}
         </View>
@@ -136,7 +136,7 @@ const s = StyleSheet.create({
   web: { flex: 1, backgroundColor: "white" }, panelBody: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 },
   panelHeading: { marginBottom: 20 }, backText: { color: "#a99dfb", fontSize: 14, marginBottom: 14 }, panelTitle: { color: "#f7f5ff", fontSize: 28, fontWeight: "800" },
   menuRow: { flexDirection: "row", alignItems: "center", paddingVertical: 17, borderBottomWidth: 1, borderBottomColor: "#2b283d", gap: 13 },
-  menuIcon: { width: 40, height: 40, borderRadius: 13, backgroundColor: "#282442", alignItems: "center", justifyContent: "center" }, menuTitle: { color: "#f0edff", fontSize: 15, fontWeight: "650" },
+  menuIcon: { width: 40, height: 40, borderRadius: 13, backgroundColor: "#282442", alignItems: "center", justifyContent: "center" }, menuTitle: { color: "#f0edff", fontSize: 15, fontWeight: "600" },
   menuSub: { color: "#8f8aa8", fontSize: 12, marginTop: 4, lineHeight: 17 }, chevron: { color: "#77718e", fontSize: 26, paddingHorizontal: 5 },
   settingRow: { flexDirection: "row", alignItems: "center", paddingVertical: 17, borderBottomWidth: 1, borderBottomColor: "#2b283d" },
   infoCard: { backgroundColor: "#1b192b", borderRadius: 16, borderWidth: 1, borderColor: "#39344f", padding: 18, marginTop: 8 },

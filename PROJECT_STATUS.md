@@ -12,7 +12,7 @@ Last reviewed: 2026-10-29
 ## Expo removal / standalone migration
 The project is being converted from Expo-managed tooling to a standalone React Native CLI setup. Expo dependencies, Expo app configuration, Expo scripts, and Expo-based CI commands are being removed.
 
-The root app currently imports only React Native primitives and `react-native-webview`, so the starter UI itself does not require Expo APIs. Native project scaffolding is a separate remaining step.
+The root app currently imports only React Native primitives and `react-native-webview`, so the starter UI itself does not require Expo APIs. Standalone entry points and Metro/Babel/Vite configuration have been added. Native project scaffolding is a separate remaining step.
 
 ## Current repository implementation
 - Root `App.js`: small React Native browser starter with address entry and WebView.
@@ -28,9 +28,9 @@ The root app currently imports only React Native primitives and `react-native-we
 - SideStore: no installable IPA is published.
 
 ## Build workflow
-Workflow: `.github/workflows/ios-build.yml`
+Workflow: `.github/workflows/build.yml`
 
-The workflow is being narrowed to the platforms with committed build scaffolding (web and Windows). iOS and Android jobs must be restored after the native `ios/` and `android/` project folders are generated, committed, and validated.
+The workflow now builds the web app and Windows installer only, using Vite and Electron. iOS and Android jobs must be restored after the native `ios/` and `android/` project folders are generated, committed, and validated.
 
 ## Imported source archive reviewed
 The supplied `Laturenapp-main 2.zip` was inspected. It contains an older, much fuller mobile app and desktop source, but those older app sources have not yet been merged into this Veyra repository. The uploaded mobile source used Expo modules and needs a deliberate migration before it can replace the current starter.

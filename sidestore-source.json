@@ -1,24 +1,23 @@
 {
-  "name": "Veyra",
+  "name": "Veyra Browser",
   "identifier": "com.thedevstars.veyra.source",
+  "subtitle": "A customizable browser for iPhone and iPad",
+  "description": "Veyra Browser SideStore source. Installable versions will be listed after a compatible IPA is published.",
+  "website": "https://github.com/theDevstars/veyra-browser",
+  "iconURL": "https://raw.githubusercontent.com/theDevstars/veyra-browser/main/assets/icon.png",
+  "tintColor": "#7867F7",
   "apps": [
     {
       "name": "Veyra Browser",
       "bundleIdentifier": "com.thedevstars.veyra",
       "developerName": "theDevstars",
-      "subtitle": "A customizable browser for your devices.",
-      "localizedDescription": "Veyra is a customizable browser project. Installable builds will appear here after a successful signed or SideStore-compatible release.",
+      "subtitle": "A customizable browser for your devices",
+      "localizedDescription": "Veyra Browser is a cross-platform browser project. A SideStore-compatible IPA will be listed here when a build is successfully published.",
       "iconURL": "https://raw.githubusercontent.com/theDevstars/veyra-browser/main/assets/icon.png",
       "tintColor": "#7867F7",
       "category": "utilities",
-      "versions": [
-        {
-          "version": "1.0.0",
-          "date": "2026-10-29T00:00:00Z",
-          "downloadURL": "https://github.com/theDevstars/veyra-browser/releases/latest/download/Veyra.ipa",
-          "size": 0
-        }
-      ]
+      "versions": []
     }
-  ]
+  ],
+  "news": []
 }

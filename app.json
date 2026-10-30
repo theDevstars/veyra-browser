@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "Veyra Browser",
+    "slug": "veyra-browser",
+    "version": "1.0.0",
+    "orientation": "default",
+    "userInterfaceStyle": "automatic",
+    "scheme": "veyra",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.thedevstars.veyra"
+    },
+    "android": {
+      "package": "com.thedevstars.veyra"
+    },
+    "web": {
+      "bundler": "metro",
+      "name": "Veyra Browser",
+      "shortName": "Veyra",
+      "themeColor": "#17152b",
+      "backgroundColor": "#10101a"
+    }
+  }
+}

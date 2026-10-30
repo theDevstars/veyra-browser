@@ -1,4 +1,4 @@
-name: Veyra multi-platform CI
+name: Veyra multi-platform builds
 
 on:
   push:
@@ -8,82 +8,149 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: veyra-ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: veyra-build-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   web:
-    name: Web export (Windows, macOS, Linux, mobile browsers)
+    name: Web export
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm install
+      - run: npm install --legacy-peer-deps
+      - name: Generate app icon
+        run: |
+          npm install --no-save sharp
+          node -e "require('sharp')('assets/veyra-icon.svg').resize(1024,1024).png().toFile('assets/icon.png')"
       - run: npx expo export --platform web
       - uses: actions/upload-artifact@v4
         with:
-          name: veyra-web
+          name: Veyra-Web
           path: dist/
           if-no-files-found: error
 
   android:
-    name: Android validation
+    name: Android APK
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm install
-      - run: npx expo export --platform android
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: npm install --legacy-peer-deps
+      - name: Generate app icon
+        run: |
+          npm install --no-save sharp
+          node -e "require('sharp')('assets/veyra-icon.svg').resize(1024,1024).png().toFile('assets/icon.png')"
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --non-interactive
+      - name: Build APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Veyra-Android-APK
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
 
   ios:
-    name: iOS validation and unsigned archive
+    name: iOS unsigned IPA
     runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --legacy-peer-deps
+      - name: Generate app icon
+        run: |
+          npm install --no-save sharp
+          node -e "require('sharp')('assets/veyra-icon.svg').resize(1024,1024).png().toFile('assets/icon.png')"
+      - name: Generate iOS project
+        run: npx expo prebuild --platform ios --non-interactive
+      - name: Install CocoaPods
+        working-directory: ios
+        run: pod install
+      - name: Build unsigned iOS app
+        run: |
+          cd ios
+          WORKSPACE=$(find . -maxdepth 1 -name '*.xcworkspace' -print -quit)
+          xcodebuild -workspace "$WORKSPACE" -scheme VeyraBrowser -configuration Release -sdk iphoneos -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+      - name: Package IPA
+        run: |
+          APP_PATH=$(find ios/build/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' -print -quit)
+          test -n "$APP_PATH"
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/
+          ditto -c -k --sequesterRsrc --keepParent Payload Veyra-unsigned.ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Veyra-unsigned-IPA
+          path: Veyra-unsigned.ipa
+          if-no-files-found: error
+
+  windows:
+    name: Windows installer
+    runs-on: windows-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm install
-      - name: Export iOS bundle
-        run: npx expo export --platform ios
-      - name: Find Xcode project
-        id: project
-        shell: bash
+      - name: Export web app
         run: |
-          PROJECT="$(find . -maxdepth 5 -name '*.xcworkspace' -not -path '*/Pods/*' -print -quit)"
-          if [ -n "$PROJECT" ]; then
-            echo "kind=workspace" >> "$GITHUB_OUTPUT"
-            echo "path=$PROJECT" >> "$GITHUB_OUTPUT"
-          else
-            PROJECT="$(find . -maxdepth 5 -name '*.xcodeproj' -not -path '*/Pods/*' -print -quit)"
-            if [ -n "$PROJECT" ]; then
-              echo "kind=project" >> "$GITHUB_OUTPUT"
-              echo "path=$PROJECT" >> "$GITHUB_OUTPUT"
-            else
-              echo "found=false" >> "$GITHUB_OUTPUT"
-              echo "No native Xcode project committed; Expo iOS export passed, skipping IPA archive."
-              exit 0
-            fi
-          fi
-          echo "found=true" >> "$GITHUB_OUTPUT"
-      - name: Archive iOS app without signing
-        if: steps.project.outputs.found == 'true'
-        shell: bash
+          npm install --legacy-peer-deps
+          npm install --no-save sharp
+          node -e "require('sharp')('assets/veyra-icon.svg').resize(1024,1024).png().toFile('assets/icon.png')"
+          npx expo export --platform web
+      - name: Prepare Electron package
         run: |
-          set -euo pipefail
-          if [ "${{ steps.project.outputs.kind }}" = "workspace" ]; then
-            xcodebuild -workspace "${{ steps.project.outputs.path }}" -scheme Veyra -configuration Release -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/Veyra.xcarchive" CODE_SIGNING_ALLOWED=NO archive
-          else
-            xcodebuild -project "${{ steps.project.outputs.path }}" -scheme Veyra -configuration Release -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/Veyra.xcarchive" CODE_SIGNING_ALLOWED=NO archive
-          fi
+          New-Item -ItemType Directory -Force desktop/web | Out-Null
+          Copy-Item -Recurse -Force dist/* desktop/web/
+      - name: Build Windows installer
+        working-directory: desktop
+        run: |
+          npm install
+          npm run dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Veyra-Windows-Installer
+          path: desktop/dist/*.exe
+          if-no-files-found: error
+
+  release:
+    name: Publish platform builds
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    needs: [web, android, ios, windows]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-files
+          merge-multiple: true
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: veyra-${{ github.run_number }}
+          name: Veyra Browser build ${{ github.run_number }}
+          body: |
+            Automated Veyra Browser multi-platform build.
+
+            The iOS IPA is unsigned and requires an appropriate signing workflow before normal iPhone installation.
+          files: release-files/*
+          prerelease: true

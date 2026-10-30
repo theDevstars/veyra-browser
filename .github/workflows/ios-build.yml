@@ -1,0 +1,90 @@
+name: iOS Unsigned IPA
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build unsigned iOS IPA
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Find Xcode project and scheme
+        id: project
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROJECT="$(find . -maxdepth 4 -name '*.xcworkspace' -not -path '*/Pods/*' -print -quit)"
+          if [ -n "$PROJECT" ]; then
+            echo "kind=workspace" >> "$GITHUB_OUTPUT"
+            echo "path=$PROJECT" >> "$GITHUB_OUTPUT"
+            LIST="$(xcodebuild -list -json -workspace "$PROJECT")"
+          else
+            PROJECT="$(find . -maxdepth 4 -name '*.xcodeproj' -not -path '*/Pods/*' -print -quit)"
+            if [ -n "$PROJECT" ]; then
+              echo "kind=project" >> "$GITHUB_OUTPUT"
+              echo "path=$PROJECT" >> "$GITHUB_OUTPUT"
+              LIST="$(xcodebuild -list -json -project "$PROJECT")"
+            else
+              echo "found=false" >> "$GITHUB_OUTPUT"
+              echo "::notice::No .xcodeproj or .xcworkspace found. Add the iOS app source; this run will finish without creating a fake IPA."
+              exit 0
+            fi
+          fi
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          SCHEME="$(printf '%s' "$LIST" | python3 -c 'import json,sys; d=json.load(sys.stdin); s=d.get("workspace",d.get("project",{})).get("schemes",[]); print(s[0] if s else "")')"
+          if [ -z "$SCHEME" ]; then
+            echo "::error::No shared Xcode scheme was found. Share an app scheme in Xcode and commit it."
+            exit 1
+          fi
+          echo "scheme=$SCHEME" >> "$GITHUB_OUTPUT"
+          echo "Using $PROJECT ($SCHEME)"
+
+      - name: Archive without signing
+        if: steps.project.outputs.found == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEST="$RUNNER_TEMP/Veyra.xcarchive"
+          if [ "${{ steps.project.outputs.kind }}" = "workspace" ]; then
+            xcodebuild -workspace "${{ steps.project.outputs.path }}" -scheme "${{ steps.project.outputs.scheme }}" -configuration Release -destination 'generic/platform=iOS' -archivePath "$DEST" CODE_SIGNING_ALLOWED=NO archive
+          else
+            xcodebuild -project "${{ steps.project.outputs.path }}" -scheme "${{ steps.project.outputs.scheme }}" -configuration Release -destination 'generic/platform=iOS' -archivePath "$DEST" CODE_SIGNING_ALLOWED=NO archive
+          fi
+          APP="$(find "$DEST/Products/Applications" -maxdepth 1 -name '*.app' -print -quit)"
+          if [ -z "$APP" ]; then
+            echo "::error::Archive completed but no .app was produced."
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/ipa/Payload"
+          cp -R "$APP" "$RUNNER_TEMP/ipa/Payload/"
+          cd "$RUNNER_TEMP/ipa"
+          zip -qry "$GITHUB_WORKSPACE/Veyra-unsigned.ipa" Payload
+
+      - name: Upload unsigned IPA
+        if: steps.project.outputs.found == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Veyra-unsigned-IPA
+          path: Veyra-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14

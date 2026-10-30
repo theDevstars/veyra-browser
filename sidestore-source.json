@@ -17,12 +17,12 @@
       "category": "utilities",
       "versions": [
         {
-          "version": "1.0.38",
-          "buildVersion": "38",
-          "date": "2026-10-30T02:14:31.183Z",
+          "version": "1.0.39",
+          "buildVersion": "39",
+          "date": "2026-10-30T02:24:20.236Z",
           "localizedDescription": "Veyra Browser cross-platform update.",
-          "downloadURL": "https://github.com/theDevstars/veyra-browser/releases/download/veyra-v1.0.38/Veyra-unsigned.ipa",
-          "size": 6976475
+          "downloadURL": "https://github.com/theDevstars/veyra-browser/releases/download/veyra-v1.0.39/Veyra-unsigned.ipa",
+          "size": 6637242
         }
       ],
       "appPermissions": {

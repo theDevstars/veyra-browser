@@ -25,13 +25,6 @@
           "photosPermission": "Choose a wallpaper for Veyra Browser."
         }
       ]
-    ],
-    "web": {
-      "bundler": "metro",
-      "name": "Veyra Browser",
-      "shortName": "Veyra",
-      "themeColor": "#17152b",
-      "backgroundColor": "#10101a"
-    }
+    ]
   }
 }

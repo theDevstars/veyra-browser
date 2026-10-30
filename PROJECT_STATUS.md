@@ -10,45 +10,40 @@ Last reviewed: 2026-10-29
 - Android application ID: com.thedevstars.veyra
 
 ## Build system
-Expo has been restored as Veyra's React Native development and build toolkit. The finished app remains branded Veyra; Expo Go is optional for previewing and is not required for EAS production builds.
-
-- Expo SDK dependency and Expo entry point restored in package.json.
-- Expo app configuration restored in app.json.
-- Expo Babel and Metro configuration added.
-- EAS Build profiles added in eas.json.
-- Web export and Windows Electron packaging switched to Expo's Metro web export.
+- Expo SDK 54 is used for iOS and Android native builds.
+- Expo web platform configuration and web export dependencies/scripts have been removed.
+- EAS Build profiles are configured in eas.json.
+- Windows has a separate Electron desktop UI and no longer consumes an Expo web export.
+- GitHub Actions validates Expo config and packages Windows on pushes/PRs; a manually dispatched run builds iOS and Android through EAS when EXPO_TOKEN is configured.
 
 ## Current implementation
-- Root App.js: small React Native browser starter with address entry and WebView.
-- desktop/: Electron shell for Windows.
+- Root App.js: early React Native browser starter with address entry and WebView.
+- desktop/index.html: standalone Windows desktop browser interface.
+- desktop/main.js: Electron app entry point.
 - sidestore-source.json: Veyra SideStore source metadata; its app version list is empty.
 - assets/veyra-icon.svg: Veyra icon source.
 
 ## Platform status
-- Web: Expo web export is configured in GitHub Actions; build still needs to run and pass.
-- Windows: Electron installer workflow is configured to package the Expo web export; build still needs to run and pass.
-- iOS: EAS preview/production profiles are configured; no IPA has been built or published yet.
-- Android: EAS preview/production profiles are configured; no APK/AAB has been built or published yet.
-- SideStore: no installable IPA is published.
+- iOS: EAS preview IPA workflow is configured; no successful IPA build has yet been verified.
+- Android: EAS preview APK workflow is configured; no successful APK build has yet been verified.
+- Windows: standalone Electron installer workflow is configured; no successful EXE build has yet been verified.
+- Web: intentionally not a target; no web export or hosted web app is configured.
+- SideStore: no installable IPA is published yet.
 
-## CI
-Workflow: .github/workflows/build.yml
-
-The workflow exports the Expo web app and packages the Windows installer. Automated EAS builds from GitHub Actions require an EXPO_TOKEN repository secret; local EAS commands are documented in the README.
-
-## Imported source archive reviewed
-The supplied Laturenapp-main 2.zip was inspected. It contains an older, fuller mobile app and desktop source, but those older app sources have not yet been merged into this Veyra repository. The older mobile source used Expo modules and needs a deliberate merge before it can replace the current starter.
+## Required build setup
+- Add the Expo access token as the GitHub Actions secret EXPO_TOKEN.
+- Ensure iOS Apple signing credentials are configured in the Expo project.
+- Run the workflow manually for iOS and Android. Windows builds run on pushes/PRs to main.
 
 ## Next milestones
-1. Run and validate the Expo web export and Windows installer workflow.
-2. Configure EAS credentials and build iOS and Android preview artifacts.
-3. Merge the fuller browser UI and features from the supplied source archive.
-4. Verify privacy controls, tabs, bookmarks, history, and customization on each platform.
+1. Run the GitHub Actions workflow and verify the Windows installer.
+2. Configure Expo credentials and run the iOS IPA and Android APK builds.
+3. Merge the fuller browser UI and features from the previously supplied source archive.
+4. Verify tabs, bookmarks, history, privacy controls, and customization on each platform.
 5. Publish a SideStore-compatible IPA release asset and populate the source feed.
-6. Expand and test the Windows desktop experience.
 
 ## Platform notes
-- The Electron wrapper packages the web build as a Windows installer; it is not a native Windows browser engine.
+- Windows uses Electron's embedded Chromium webview, not a native Windows browser engine.
 - iOS WebView restrictions limit browser-engine and extension capabilities.
 - Cookie blocking and ad/tracker blocking are best-effort and vary by platform.
 - A SideStore feed does not itself create, sign, or host an IPA.

@@ -1,9 +1,90 @@
 import React, { useState } from "react";
 import { Platform, SafeAreaView, StatusBar, StyleSheet, Text, TextInput, Pressable, View } from "react-native";
 import { WebView } from "react-native-webview";
+
 export default function App() {
- const [address,setAddress]=useState("https://example.com"),[url,setUrl]=useState("https://example.com"),[opened,setOpened]=useState(false);
- const navigate=()=>{const v=address.trim();if(!v)return;const next=/^https?:\\/\\//i.test(v)?v:v.includes(".")&&!v.includes(" ")?"https://"+v:"https://www.google.com/search?q="+encodeURIComponent(v);setUrl(next);setAddress(next);setOpened(true);};
- return <SafeAreaView style={s.root}><StatusBar barStyle="light-content"/><View style={s.header}><Text style={s.logo}>Veyra</Text><Text style={s.tag}>BROWSER</Text></View><View style={s.search}><TextInput value={address} onChangeText={setAddress} onSubmitEditing={navigate} autoCapitalize="none" autoCorrect={false} keyboardType="url" placeholder="Search or enter address" placeholderTextColor="#9290a8" style={s.input}/><Pressable onPress={navigate} style={s.go}><Text style={s.goText}>Go</Text></Pressable></View>{opened?<WebView source={{uri:url}} style={s.web} onNavigationStateChange={x=>setAddress(x.url)}/>:<View style={s.home}><Text style={s.title}>Browse your way.</Text><Text style={s.sub}>A fresh, customizable web experience.</Text><Text style={s.note}>Veyra is an early cross-platform starter. More browser controls are coming.</Text></View>}<View style={s.footer}><Text style={s.footText}>{Platform.OS==="web"?"Veyra Web":"Veyra Browser"}</Text></View></SafeAreaView>;
+  const [address, setAddress] = useState("https://example.com");
+  const [url, setUrl] = useState("https://example.com");
+  const [opened, setOpened] = useState(false);
+
+  const navigate = () => {
+    const value = address.trim();
+    if (!value) return;
+
+    const hasProtocol =
+      value.startsWith("https://") || value.startsWith("http://");
+    const next = hasProtocol
+      ? value
+      : value.includes(".") && !value.includes(" ")
+        ? "https://" + value
+        : "https://www.google.com/search?q=" + encodeURIComponent(value);
+
+    setUrl(next);
+    setAddress(next);
+    setOpened(true);
+  };
+
+  return (
+    <SafeAreaView style={s.root}>
+      <StatusBar barStyle="light-content" />
+      <View style={s.header}>
+        <Text style={s.logo}>Veyra</Text>
+        <Text style={s.tag}>BROWSER</Text>
+      </View>
+      <View style={s.search}>
+        <TextInput
+          value={address}
+          onChangeText={setAddress}
+          onSubmitEditing={navigate}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+          placeholder="Search or enter address"
+          placeholderTextColor="#9290a8"
+          style={s.input}
+        />
+        <Pressable onPress={navigate} style={s.go}>
+          <Text style={s.goText}>Go</Text>
+        </Pressable>
+      </View>
+      {opened ? (
+        <WebView
+          source={{ uri: url }}
+          style={s.web}
+          onNavigationStateChange={(state) => setAddress(state.url)}
+        />
+      ) : (
+        <View style={s.home}>
+          <Text style={s.title}>Browse your way.</Text>
+          <Text style={s.sub}>A fresh, customizable web experience.</Text>
+          <Text style={s.note}>
+            Veyra is an early cross-platform starter. More browser controls are coming.
+          </Text>
+        </View>
+      )}
+      <View style={s.footer}>
+        <Text style={s.footText}>
+          {Platform.OS === "web" ? "Veyra Web" : "Veyra Browser"}
+        </Text>
+      </View>
+    </SafeAreaView>
+  );
 }
-const s=StyleSheet.create({root:{flex:1,backgroundColor:"#10101a"},header:{paddingTop:22,paddingBottom:16,alignItems:"center"},logo:{fontSize:30,fontWeight:"800",color:"#f7f5ff",letterSpacing:1},tag:{fontSize:10,letterSpacing:4,color:"#9b8cff",marginTop:2},search:{marginHorizontal:16,flexDirection:"row",backgroundColor:"#242238",borderRadius:18,padding:6,alignItems:"center",borderWidth:1,borderColor:"#484168"},input:{flex:1,color:"white",paddingHorizontal:12,paddingVertical:12,fontSize:15},go:{backgroundColor:"#7665ed",paddingHorizontal:18,paddingVertical:11,borderRadius:13},goText:{color:"white",fontWeight:"700"},home:{flex:1,alignItems:"center",justifyContent:"center",padding:28},title:{color:"white",fontSize:32,fontWeight:"800",textAlign:"center"},sub:{color:"#c5c0dc",fontSize:16,marginTop:12,textAlign:"center"},note:{color:"#85819b",fontSize:13,marginTop:30,textAlign:"center",lineHeight:20},web:{flex:1,marginTop:12},footer:{padding:12,alignItems:"center"},footText:{color:"#77738f",fontSize:11}});
+
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: "#10101a" },
+  header: { paddingTop: 22, paddingBottom: 16, alignItems: "center" },
+  logo: { fontSize: 30, fontWeight: "800", color: "#f7f5ff", letterSpacing: 1 },
+  tag: { fontSize: 10, letterSpacing: 4, color: "#9b8cff", marginTop: 2 },
+  search: { marginHorizontal: 16, flexDirection: "row", backgroundColor: "#242238", borderRadius: 18, padding: 6, alignItems: "center", borderWidth: 1, borderColor: "#484168" },
+  input: { flex: 1, color: "white", paddingHorizontal: 12, paddingVertical: 12, fontSize: 15 },
+  go: { backgroundColor: "#7665ed", paddingHorizontal: 18, paddingVertical: 11, borderRadius: 13 },
+  goText: { color: "white", fontWeight: "700" },
+  home: { flex: 1, alignItems: "center", justifyContent: "center", padding: 28 },
+  title: { color: "white", fontSize: 32, fontWeight: "800", textAlign: "center" },
+  sub: { color: "#c5c0dc", fontSize: 16, marginTop: 12, textAlign: "center" },
+  note: { color: "#85819b", fontSize: 13, marginTop: 30, textAlign: "center", lineHeight: 20 },
+  web: { flex: 1, marginTop: 12 },
+  footer: { padding: 12, alignItems: "center" },
+  footText: { color: "#77738f", fontSize: 11 },
+});

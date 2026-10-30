@@ -2,6 +2,18 @@
 
 Veyra is a cross-platform browser project built with **React Native and Expo** for iOS and Android, plus a separate Electron desktop app for Windows. Expo is build tooling; the finished mobile app is branded Veyra.
 
+## App previews
+
+These concept previews show the Veyra start page across mobile, tablet, and desktop layouts. They are illustrative UI previews, not screenshots captured from a running build.
+
+| Mobile | Tablet |
+|---|---|
+| ![Veyra mobile preview](assets/screenshots/veyra-mobile.svg) | ![Veyra tablet preview](assets/screenshots/veyra-tablet.svg) |
+
+### Windows desktop
+
+![Veyra desktop preview](assets/screenshots/veyra-desktop.svg)
+
 ## Platforms
 
 | Platform | Build path | Current state |

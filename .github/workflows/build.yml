@@ -53,10 +53,10 @@ jobs:
           cd ios
           WORKSPACE=$(find . -maxdepth 1 -name '*.xcworkspace' -print -quit)
           if [ -z "$WORKSPACE" ]; then echo "No Xcode workspace found"; ls -la; exit 1; fi
-          SCHEME=$(xcodebuild -list -json -workspace "$WORKSPACE" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);const w=Object.values(j).find(v=>v&&v.schemes);if(!w||!w.schemes.length)process.exit(2);const schemes=w.schemes;const app=schemes.find(s=>s==='Veyra')||schemes.find(s=>s==='Veyra Browser')||schemes.find(s=>!/(^Pods$|^Expo|^EX|^React|^hermes)/i.test(s));if(!app){console.error('No app scheme found:',schemes.join(', '));process.exit(3)}console.log(app)})")
+          SCHEME=$(xcodebuild -list -json -workspace "$WORKSPACE" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);const projects=Object.values(j).filter(v=>v&&Array.isArray(v.schemes));const schemes=projects.flatMap(v=>v.schemes);if(!schemes.length){console.error('No Xcode schemes found');process.exit(2)}const app=schemes.find(s=>s==='VeyraBrowser')||schemes.find(s=>s==='Veyra')||schemes.find(s=>!/(^Pods|^FBLazyVector$|^Expo|^EX|^React|^hermes)/i.test(s));if(!app){console.error('No app scheme found:',schemes.join(', '));process.exit(3)}console.log(app)})")
           echo "Building Xcode workspace: $WORKSPACE"
           echo "Using Xcode scheme: $SCHEME"
-          xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release -sdk iphoneos -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+          xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release -sdk iphoneos -destination "generic/platform=iOS" -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
       - name: Package IPA
         run: |
           echo "Searching for the built iOS app bundle..."

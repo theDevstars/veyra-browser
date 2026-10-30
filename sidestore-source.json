@@ -4,7 +4,7 @@
   "subtitle": "A customizable browser for iPhone and iPad",
   "description": "Veyra Browser SideStore source. Installable versions will be listed after a compatible IPA is published.",
   "website": "https://github.com/theDevstars/veyra-browser",
-  "iconURL": "https://raw.githubusercontent.com/theDevstars/veyra-browser/main/assets/icon.png",
+  "iconURL": "https://raw.githubusercontent.com/theDevstars/veyra-browser/main/assets/veyra-icon.svg",
   "tintColor": "#7867F7",
   "apps": [
     {
@@ -13,7 +13,7 @@
       "developerName": "theDevstars",
       "subtitle": "A customizable browser for your devices",
       "localizedDescription": "Veyra Browser is a cross-platform browser project. A SideStore-compatible IPA will be listed here when a build is successfully published.",
-      "iconURL": "https://raw.githubusercontent.com/theDevstars/veyra-browser/main/assets/icon.png",
+      "iconURL": "https://raw.githubusercontent.com/theDevstars/veyra-browser/main/assets/veyra-icon.svg",
       "tintColor": "#7867F7",
       "category": "utilities",
       "versions": []

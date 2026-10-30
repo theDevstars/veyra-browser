@@ -1,4 +1,4 @@
-name: Veyra Multi-Platform Builds
+name: Veyra multi-platform CI
 
 on:
   push:
@@ -11,173 +11,79 @@ permissions:
   contents: read
 
 concurrency:
-  group: veyra-build-\${{ github.ref }}
+  group: veyra-ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  web:
+    name: Web export (Windows, macOS, Linux, mobile browsers)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm install
+      - run: npx expo export --platform web
+      - uses: actions/upload-artifact@v4
+        with:
+          name: veyra-web
+          path: dist/
+          if-no-files-found: error
+
+  android:
+    name: Android validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm install
+      - run: npx expo export --platform android
+
   ios:
-    name: iOS (unsigned IPA)
+    name: iOS validation and unsigned archive
     runs-on: macos-15
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      - name: Select Xcode
-        uses: maxim-lobanov/setup-xcode@v1
+      - uses: actions/setup-node@v4
         with:
-          xcode-version: latest-stable
-      - name: Find Xcode project and scheme
+          node-version: 22
+          cache: npm
+      - run: npm install
+      - name: Export iOS bundle
+        run: npx expo export --platform ios
+      - name: Find Xcode project
         id: project
         shell: bash
         run: |
-          set -euo pipefail
           PROJECT="$(find . -maxdepth 5 -name '*.xcworkspace' -not -path '*/Pods/*' -print -quit)"
-          KIND=workspace
-          if [ -z "$PROJECT" ]; then
+          if [ -n "$PROJECT" ]; then
+            echo "kind=workspace" >> "$GITHUB_OUTPUT"
+            echo "path=$PROJECT" >> "$GITHUB_OUTPUT"
+          else
             PROJECT="$(find . -maxdepth 5 -name '*.xcodeproj' -not -path '*/Pods/*' -print -quit)"
-            KIND=project
-          fi
-          if [ -z "$PROJECT" ]; then
-            echo "found=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::No Xcode project found; skipping iOS build until iOS source is added."
-            exit 0
+            if [ -n "$PROJECT" ]; then
+              echo "kind=project" >> "$GITHUB_OUTPUT"
+              echo "path=$PROJECT" >> "$GITHUB_OUTPUT"
+            else
+              echo "found=false" >> "$GITHUB_OUTPUT"
+              echo "No native Xcode project committed; Expo iOS export passed, skipping IPA archive."
+              exit 0
+            fi
           fi
           echo "found=true" >> "$GITHUB_OUTPUT"
-          echo "kind=$KIND" >> "$GITHUB_OUTPUT"
-          echo "path=$PROJECT" >> "$GITHUB_OUTPUT"
-          if [ "$KIND" = workspace ]; then
-            LIST="$(xcodebuild -list -json -workspace "$PROJECT")"
-          else
-            LIST="$(xcodebuild -list -json -project "$PROJECT")"
-          fi
-          SCHEME="$(printf '%s' "$LIST" | python3 -c 'import json,sys; d=json.load(sys.stdin); s=d.get("workspace",d.get("project",{})).get("schemes",[]); print(s[0] if s else "")')"
-          if [ -z "$SCHEME" ]; then
-            echo "::error::No shared Xcode scheme found."
-            exit 1
-          fi
-          echo "scheme=$SCHEME" >> "$GITHUB_OUTPUT"
-      - name: Archive unsigned iOS app
+      - name: Archive iOS app without signing
         if: steps.project.outputs.found == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          DEST="$RUNNER_TEMP/Veyra.xcarchive"
-          if [ "\${{ steps.project.outputs.kind }}" = "workspace" ]; then
-            xcodebuild -workspace "\${{ steps.project.outputs.path }}" -scheme "\${{ steps.project.outputs.scheme }}" -configuration Release -destination 'generic/platform=iOS' -archivePath "$DEST" CODE_SIGNING_ALLOWED=NO archive
+          if [ "${{ steps.project.outputs.kind }}" = "workspace" ]; then
+            xcodebuild -workspace "${{ steps.project.outputs.path }}" -scheme Veyra -configuration Release -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/Veyra.xcarchive" CODE_SIGNING_ALLOWED=NO archive
           else
-            xcodebuild -project "\${{ steps.project.outputs.path }}" -scheme "\${{ steps.project.outputs.scheme }}" -configuration Release -destination 'generic/platform=iOS' -archivePath "$DEST" CODE_SIGNING_ALLOWED=NO archive
+            xcodebuild -project "${{ steps.project.outputs.path }}" -scheme Veyra -configuration Release -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/Veyra.xcarchive" CODE_SIGNING_ALLOWED=NO archive
           fi
-          APP="$(find "$DEST/Products/Applications" -maxdepth 1 -name '*.app' -print -quit)"
-          test -n "$APP" || { echo "::error::No iOS app was produced."; exit 1; }
-          mkdir -p "$RUNNER_TEMP/ipa/Payload"
-          cp -R "$APP" "$RUNNER_TEMP/ipa/Payload/"
-          cd "$RUNNER_TEMP/ipa"
-          zip -qry "$GITHUB_WORKSPACE/Veyra-iOS-unsigned.ipa" Payload
-      - name: Upload iOS IPA
-        if: steps.project.outputs.found == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: Veyra-iOS-unsigned-IPA
-          path: Veyra-iOS-unsigned.ipa
-          if-no-files-found: error
-          retention-days: 14
-
-  android:
-    name: Android (APK/AAB)
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Java
-        if: hashFiles('**/gradlew') != ''
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-      - name: Set up Gradle
-        if: hashFiles('**/gradlew') != ''
-        uses: gradle/actions/setup-gradle@v4
-      - name: Build Android app
-        id: android
-        shell: bash
-        run: |
-          set -euo pipefail
-          WRAPPER="$(find . -maxdepth 5 -name gradlew -not -path '*/.gradle/*' -print -quit)"
-          if [ -z "$WRAPPER" ]; then
-            echo "found=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::No Gradle wrapper found; skipping Android build until Android source is added."
-            exit 0
-          fi
-          chmod +x "$WRAPPER"
-          "$WRAPPER" --no-daemon assembleRelease
-          "$WRAPPER" --no-daemon bundleRelease || echo "::notice::No Android bundleRelease task; APK build is still available."
-          echo "found=true" >> "$GITHUB_OUTPUT"
-      - name: Upload Android packages
-        if: steps.android.outputs.found == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: Veyra-Android
-          path: |
-            **/build/outputs/apk/**/*.apk
-            **/build/outputs/bundle/**/*.aab
-          if-no-files-found: error
-          retention-days: 14
-
-  desktop:
-    name: Desktop (\${{ matrix.os }})
-    runs-on: \${{ matrix.os }}
-    timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, macos-15, ubuntu-latest]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Node.js
-        if: hashFiles('**/package.json') != ''
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-      - name: Install desktop dependencies
-        id: desktop
-        shell: bash
-        run: |
-          set -euo pipefail
-          PACKAGE="$(find . -maxdepth 4 -name package.json -not -path '*/node_modules/*' -print -quit)"
-          if [ -z "$PACKAGE" ]; then
-            echo "found=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::No package.json found; skipping desktop build until desktop app source is added."
-            exit 0
-          fi
-          DIR="$(dirname "$PACKAGE")"
-          cd "$DIR"
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-          fi
-          echo "dir=$DIR" >> "$GITHUB_OUTPUT"
-          echo "found=true" >> "$GITHUB_OUTPUT"
-      - name: Build desktop app
-        if: steps.desktop.outputs.found == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd "\${{ steps.desktop.outputs.dir }}"
-          npm run build --if-present
-          npm run dist --if-present
-          npm run package --if-present
-          npm run make --if-present
-      - name: Upload desktop packages
-        if: steps.desktop.outputs.found == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: Veyra-Desktop-\${{ matrix.os }}
-          path: |
-            dist/**
-            release/**
-            out/**
-            build/**
-            !**/node_modules/**
-          if-no-files-found: warn
-          retention-days: 14

@@ -1,0 +1,59 @@
+name: Veyra builds
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: veyra-build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  web:
+    name: Web build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm run build:web
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Veyra-Web
+          path: dist/
+          if-no-files-found: error
+
+  windows:
+    name: Windows installer
+    runs-on: windows-latest
+    needs: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm run build:web
+      - name: Prepare Electron package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force desktop/web | Out-Null
+          Copy-Item -Recurse -Force dist/* desktop/web/
+      - name: Build Windows installer
+        working-directory: desktop
+        run: |
+          npm install
+          npm run dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Veyra-Windows-Installer
+          path: desktop/dist/*.exe
+          if-no-files-found: error

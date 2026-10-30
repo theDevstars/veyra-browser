@@ -2,28 +2,30 @@
   "name": "veyra-browser",
   "version": "1.0.0",
   "private": true,
-  "main": "node_modules/expo/AppEntry.js",
+  "main": "index.js",
   "scripts": {
-    "start": "expo start --tunnel",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web",
-    "check": "npx expo-doctor"
+    "start": "react-native start",
+    "android": "react-native run-android",
+    "ios": "react-native run-ios",
+    "web": "vite --host 0.0.0.0",
+    "build:web": "vite build",
+    "check": "node --check App.js && node --check index.js"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
-    "@expo/vector-icons": "^15.0.0",
-    "expo": "~54.0.0",
-    "expo-image-picker": "~17.0.0",
-    "expo-status-bar": "~3.0.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
-    "react-native-safe-area-context": "~5.6.0",
-    "react-native-web": "~0.21.0",
+    "react-native-safe-area-context": "5.6.0",
+    "react-native-web": "0.21.0",
     "react-native-webview": "13.15.0"
   },
   "devDependencies": {
+    "@react-native-community/cli": "^20.0.0",
+    "@react-native/babel-preset": "0.81.5",
+    "@react-native/metro-config": "0.81.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.0.0",
     "@types/react": "~19.1.10",
     "typescript": "~5.9.2"
   }

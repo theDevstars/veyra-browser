@@ -84,7 +84,7 @@ export default function App() {
         <WebView ref={web} source={{ uri: url }} style={s.web} onNavigationStateChange={st => { setAddress(st.url); setUrl(st.url); setCanBack(st.canGoBack); setCanForward(st.canGoForward); }} javaScriptEnabled={prefs.javascript} thirdPartyCookiesEnabled={!prefs.blockCookies} sharedCookiesEnabled={!prefs.blockCookies} allowsBackForwardNavigationGestures />
       ) : (
         <View style={s.content}>
-          <View style={s.topBrand}><View><Text style={s.brand}>veyra</Text><Text style={s.brandCaption}>BROWSER</Text></View><Pressable style={s.topAction} onPress={() => { setPanel("settings"); setSettingsSection("main"); }}><Glyph name="settings" size={21} /></Pressable></View>
+          <View style={s.topBrand}><View><Text style={s.brand}>veyra</Text><Text style={s.brandCaption}>BROWSER</Text></View></View>
           {panel === "home" && <ScrollView contentContainerStyle={s.home}>
             <View style={s.heroMark}><Text style={s.heroV}>V</Text></View>
             <Text style={s.welcome}>Browse your way.</Text>

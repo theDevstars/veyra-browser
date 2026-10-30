@@ -1,4 +1,4 @@
-name: Veyra builds
+name: Veyra native and desktop builds
 
 on:
   push:
@@ -15,8 +15,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  web:
-    name: Expo web export
+  config-check:
+    name: Check Expo native configuration
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,30 +24,17 @@ jobs:
         with:
           node-version: 22
       - run: npm install
-      - run: npx expo export --platform web --output-dir dist
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Veyra-Web
-          path: dist/
-          if-no-files-found: error
+      - run: npx expo config --type public
 
   windows:
-    name: Windows installer
+    name: Build Windows installer
     runs-on: windows-latest
-    needs: web
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install
-      - run: npx expo export --platform web --output-dir dist
-      - name: Prepare Electron package
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force desktop/web | Out-Null
-          Copy-Item -Recurse -Force dist/* desktop/web/
-      - name: Build Windows installer
+      - name: Build Veyra Browser installer
         working-directory: desktop
         run: |
           npm install
@@ -57,3 +44,24 @@ jobs:
           name: Veyra-Windows-Installer
           path: desktop/dist/*.exe
           if-no-files-found: error
+
+  mobile:
+    name: Build iOS IPA and Android APK
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Require Expo build credentials
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::Add EXPO_TOKEN in GitHub repository Actions secrets before starting mobile builds."
+            exit 1
+          fi
+      - run: npm install
+      - name: Build iOS IPA and Android APK
+        run: npx eas-cli build --platform all --profile preview --non-interactive

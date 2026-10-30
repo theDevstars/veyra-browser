@@ -80,7 +80,7 @@ export default function App() {
   return (
     <SafeAreaView style={s.root}>
       <StatusBar barStyle="light-content" backgroundColor="#10101a" />
-      {opened ? (
+      {opened && panel === "home" ? (
         <WebView ref={web} source={{ uri: url }} style={s.web} onNavigationStateChange={st => { setAddress(st.url); setUrl(st.url); setCanBack(st.canGoBack); setCanForward(st.canGoForward); }} javaScriptEnabled={prefs.javascript} thirdPartyCookiesEnabled={!prefs.blockCookies} sharedCookiesEnabled={!prefs.blockCookies} allowsBackForwardNavigationGestures />
       ) : (
         <View style={s.content}>

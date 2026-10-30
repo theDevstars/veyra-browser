@@ -1,32 +1,51 @@
 # Veyra Browser
 
-Veyra is a cross-platform browser project targeting **iOS, Android, Windows desktop, and the web**.
+Veyra is a cross-platform browser project. The codebase is being moved to a **standalone React Native CLI** setup with no Expo runtime, tooling, configuration, or branding.
 
 ## Platforms
 
-| Platform | Current build path | Output |
+| Platform | Build path | Current state |
 |---|---|---|
-| iOS | Expo prebuild + Xcode on macOS | Unsigned IPA artifact (requires signing for ordinary iPhone installation) |
-| Android | Expo prebuild + Gradle | Release APK artifact |
-| Windows | Expo web export packaged with Electron | Windows NSIS installer |
-| Web | Expo web export | Static site in `dist/`, usable on desktop and mobile browsers |
+| Web | Vite + React Native Web | Build workflow configured |
+| Windows | Electron wrapping the web build | Installer workflow configured |
+| iOS | Native React Native CLI + Xcode | Native iOS project still needs to be generated and committed |
+| Android | Native React Native CLI + Gradle | Native Android project still needs to be generated and committed |
 
-The Windows package currently wraps the web export in Electron; it is not a separate native browser engine.
+The Windows package wraps the web build in Electron; it is not a separate native browser engine.
 
 ## Development
 
+Install dependencies:
+
 ```bash
-npm install --legacy-peer-deps
-npx expo start
+npm install
 ```
 
-Use `npx expo start --ios`, `npx expo start --android`, or `npx expo start --web` as appropriate.
+Run the web version:
+
+```bash
+npm run web
+```
+
+Build the web version:
+
+```bash
+npm run build:web
+```
+
+For native development, once the `ios/` and `android/` projects are added, use:
+
+```bash
+npm start
+npm run ios
+npm run android
+```
 
 ## Build workflow
 
-GitHub Actions workflow: [Veyra multi-platform builds](https://github.com/theDevstars/veyra-browser/actions/workflows/ios-build.yml)
+GitHub Actions: [Veyra builds](https://github.com/theDevstars/veyra-browser/actions/workflows/ios-build.yml)
 
-It validates/exports the web app, builds an Android APK, attempts an unsigned iOS IPA build, and packages a Windows installer. Run it manually from the Actions tab. Artifacts are attached to successful workflow runs.
+The workflow builds the web app and packages the Windows Electron installer. iOS and Android CI builds are intentionally not advertised until their native project folders and platform configuration are committed.
 
 ## SideStore source
 
@@ -34,14 +53,14 @@ Add this source URL in SideStore:
 
 `https://raw.githubusercontent.com/theDevstars/veyra-browser/main/sidestore-source.json`
 
-The source feed is live, but it currently has **no installable versions**. A SideStore-compatible IPA must first be built, signed/packaged appropriately, and published as a release asset. An unsigned IPA is not directly installable on a normal iPhone.
+The feed currently has no installable versions. A compatible IPA must be built, signed/packaged appropriately, and published as a release asset before it can be installed through SideStore.
 
 ## Project status
 
-See [PROJECT_STATUS.md](PROJECT_STATUS.md) for current implementation, build status, known limitations, and next milestones.
+See [PROJECT_STATUS.md](PROJECT_STATUS.md) for current implementation, migration status, and next milestones.
 
 ## Important limitations
 
-- iOS third-party browsers use Apple's permitted web-rendering stack and cannot freely replace the system browser engine.
+- iOS third-party browsers are subject to Apple's web-rendering and distribution requirements.
 - Ad/tracker and cookie controls are best-effort and vary by platform.
-- The browser source is still under active development; successful CI builds are not proof that every browser feature is production-ready.
+- The current app is an early browser starter; successful web packaging does not mean every browser feature is complete.

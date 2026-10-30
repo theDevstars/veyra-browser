@@ -1,10 +1,9 @@
 {
   "name": "Veyra Browser",
-  "identifier": "com.thedevstars.veyra.source",
-  "subtitle": "A customizable browser for iPhone and iPad",
-  "description": "Veyra Browser SideStore source. Installable versions will be listed after a compatible IPA is published.",
-  "website": "https://github.com/theDevstars/veyra-browser",
+  "subtitle": "A customizable browser for your devices",
+  "description": "Veyra Browser for iPhone and iPad. Updates are published with each GitHub release.",
   "iconURL": "https://raw.githubusercontent.com/theDevstars/veyra-browser/main/assets/veyra-icon.svg",
+  "website": "https://github.com/theDevstars/veyra-browser",
   "tintColor": "#7867F7",
   "apps": [
     {
@@ -12,11 +11,26 @@
       "bundleIdentifier": "com.thedevstars.veyra",
       "developerName": "theDevstars",
       "subtitle": "A customizable browser for your devices",
-      "localizedDescription": "Veyra Browser is a cross-platform browser project. A SideStore-compatible IPA will be listed here when a build is successfully published.",
+      "localizedDescription": "Browse with Veyra Browser, with customizable browsing features and privacy settings.",
       "iconURL": "https://raw.githubusercontent.com/theDevstars/veyra-browser/main/assets/veyra-icon.svg",
       "tintColor": "#7867F7",
       "category": "utilities",
-      "versions": []
+      "versions": [
+        {
+          "version": "1.0.30",
+          "buildVersion": "30",
+          "date": "2026-10-30T01:50:33.847Z",
+          "localizedDescription": "Veyra Browser cross-platform update.",
+          "downloadURL": "https://github.com/theDevstars/veyra-browser/releases/download/veyra-v1.0.30/Veyra-unsigned.ipa",
+          "size": 6526112
+        }
+      ],
+      "appPermissions": {
+        "entitlements": [],
+        "privacy": {
+          "NSPhotoLibraryUsageDescription": "Choose a wallpaper for Veyra Browser."
+        }
+      }
     }
   ],
   "news": []

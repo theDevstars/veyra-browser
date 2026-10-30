@@ -1,0 +1,10 @@
+{
+  "name": "veyra-browser-desktop",
+  "version": "1.0.0",
+  "description": "Veyra Browser for Windows",
+  "main": "main.js",
+  "author": "theDevstars",
+  "scripts": { "start": "electron .", "dist": "electron-builder --win nsis" },
+  "devDependencies": { "electron": "^35.0.0", "electron-builder": "^26.0.12" },
+  "build": { "appId": "com.thedevstars.veyra", "productName": "Veyra Browser", "directories": { "output": "dist" }, "files": ["main.js", "web/**/*"], "win": { "target": ["nsis"], "artifactName": "Veyra-Browser-Setup-${version}.${ext}" }, "nsis": { "oneClick": false, "perMachine": false, "allowToChangeInstallationDirectory": true } }
+}

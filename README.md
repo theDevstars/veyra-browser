@@ -43,7 +43,7 @@ npm run android
 
 ## Build workflow
 
-GitHub Actions: [Veyra builds](https://github.com/theDevstars/veyra-browser/actions/workflows/ios-build.yml)
+GitHub Actions: [Veyra builds](https://github.com/theDevstars/veyra-browser/actions/workflows/build.yml)
 
 The workflow builds the web app and packages the Windows Electron installer. iOS and Android CI builds are intentionally not advertised until their native project folders and platform configuration are committed.
 

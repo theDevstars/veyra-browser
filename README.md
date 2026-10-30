@@ -1,76 +1,47 @@
 # Veyra Browser
 
-Veyra is a cross-platform browser project built with **React Native and Expo**. Expo is the development and native build toolkit; the finished app is branded entirely as Veyra.
+Veyra is a cross-platform browser project built with **React Native and Expo** for iOS and Android, plus a separate Electron desktop app for Windows. Expo is build tooling; the finished mobile app is branded Veyra.
 
 ## Platforms
 
 | Platform | Build path | Current state |
 |---|---|---|
-| iOS | Expo + EAS Build | EAS profiles configured; build not yet run |
-| Android | Expo + EAS Build | EAS profiles configured; build not yet run |
-| Web | Expo Metro web export | GitHub Actions export configured |
-| Windows | Electron wrapping the Expo web export | Installer workflow configured |
+| iOS | Expo + EAS Build | Preview IPA build configured; requires Expo and Apple signing credentials |
+| Android | Expo + EAS Build | Preview APK build configured; requires an Expo build token |
+| Windows | Standalone Electron desktop UI | Installer workflow configured; build result appears in GitHub Actions artifacts |
 
-The Windows package wraps the web build in Electron; it is not a separate native browser engine.
+There is no hosted web-app target or Expo web export. The Windows app has its own desktop interface and does not depend on a web export.
 
-## Development
+## Mobile development
 
-Install dependencies:
+Install dependencies and start Expo:
 
 ```bash
 npm install
-```
-
-Start Expo:
-
-```bash
 npx expo start
 ```
 
-Run the web version:
+Expo Go is optional for previewing. It is not required for EAS cloud builds.
+
+## Build iOS IPA and Android APK
+
+1. Add an `EXPO_TOKEN` secret in the GitHub repository's **Settings → Secrets and variables → Actions**.
+2. Make sure the Expo project is configured and iOS signing credentials are available.
+3. Open [GitHub Actions](https://github.com/theDevstars/veyra-browser/actions/workflows/build.yml).
+4. Select **Run workflow**.
+
+The workflow runs EAS with the `preview` profile for both iOS and Android. EAS build pages provide the resulting IPA and APK download links when builds finish successfully. If the Android preview output is generated as an AAB instead of an APK, change the Android preview build type to APK in the EAS profile before running.
+
+You can also build from a machine with EAS CLI installed:
 
 ```bash
-npm run web
+npx eas-cli build --platform ios --profile preview
+npx eas-cli build --platform android --profile preview
 ```
 
-Run on a connected native development device or simulator:
+## Build Windows EXE
 
-```bash
-npm run ios
-npm run android
-```
-
-These native run commands require the relevant Xcode or Android Studio toolchain. **Expo Go is optional for previewing; it is not required for EAS production builds.**
-
-## EAS Build
-
-Install and sign in to EAS CLI:
-
-```bash
-npm install --global eas-cli
-eas login
-```
-
-Build an iOS or Android preview:
-
-```bash
-eas build --platform ios --profile preview
-eas build --platform android --profile preview
-```
-
-Build production releases:
-
-```bash
-eas build --platform all --profile production
-```
-
-EAS credentials and Apple Developer requirements still apply. These profiles configure builds; they do not mean an IPA or APK has already been produced.
-
-## GitHub Actions
-
-[Veyra builds](https://github.com/theDevstars/veyra-browser/actions/workflows/build.yml) exports the Expo web app and packages the Windows Electron installer.
-
-Automated EAS builds from GitHub Actions require an EXPO_TOKEN repository secret. The current workflow does not claim to produce iOS or Android binaries automatically.
+The Windows installer builds automatically in GitHub Actions on pushes and pull requests to `main`. Open the workflow run and download the `Veyra-Windows-Installer` artifact.
 
 ## SideStore source
 
@@ -78,15 +49,11 @@ Add this source URL in SideStore:
 
 `https://raw.githubusercontent.com/theDevstars/veyra-browser/main/sidestore-source.json`
 
-The feed currently has no installable versions. A SideStore-compatible IPA must still be built, signed/packaged appropriately, and published as a release asset.
-
-## Project status
-
-See [PROJECT_STATUS.md](PROJECT_STATUS.md) for implementation and next milestones.
+The feed still needs a successful IPA build, SideStore-compatible signing/packaging, a published release asset, and a populated app version entry before it can install Veyra.
 
 ## Important limitations
 
-- Expo is tooling and does not add Expo branding to the finished Veyra app.
+- A successful package build does not mean every planned browser feature is complete.
 - iOS third-party browsers are subject to Apple's web-rendering and distribution requirements.
-- Ad/tracker and cookie controls are best-effort and vary by platform.
-- The current app is an early browser starter; successful packaging does not mean every browser feature is complete.
+- Cookie controls and ad/tracker blocking vary by platform.
+- Windows currently uses Electron's embedded Chromium webview; it is a separate desktop app, not a native Windows browser engine.

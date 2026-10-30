@@ -3,8 +3,9 @@
     "name": "Veyra Browser",
     "slug": "veyra-browser",
     "version": "1.0.0",
+    "icon": "./assets/icon.png",
     "orientation": "default",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "scheme": "veyra",
     "ios": {
       "supportsTablet": true,

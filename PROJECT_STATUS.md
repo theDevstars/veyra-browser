@@ -6,67 +6,46 @@ Last reviewed: 2026-10-29
 - Repository: https://github.com/theDevstars/veyra-browser
 - Default branch: `main`
 - App name: Veyra Browser
-- Expo slug: `veyra-browser`
-- iOS bundle ID: `com.thedevstars.veyra`
-- Android application ID: `com.thedevstars.veyra`
+- iOS bundle ID target: `com.thedevstars.veyra`
+- Android application ID target: `com.thedevstars.veyra`
 
-## Imported source archive reviewed
-The supplied `Laturenapp-main 2.zip` was inspected. It contains:
-- A fuller React Native mobile browser implementation in `App.js` (about 92 KB).
-- Expo configuration and dependencies, including AsyncStorage, Image Picker, Safe Area Context, and WebView.
-- A desktop Electron implementation and Windows installer configuration.
-- Two older Saturn/Lantern iOS/mobile build workflows.
-- Saturn-branded app/feed metadata and icon assets.
+## Expo removal / standalone migration
+The project is being converted from Expo-managed tooling to a standalone React Native CLI setup. Expo dependencies, Expo app configuration, Expo scripts, and Expo-based CI commands are being removed.
 
-**Important:** the full 92 KB mobile `App.js` and the large desktop HTML source have not yet been copied into this repository. The current root `App.js` remains the small starter app. The repository dependency/configuration files were aligned with the imported app's dependencies, and a Veyra icon source plus a new Electron wrapper were added. Do not treat the imported feature set as already present in the repo until those source files are merged.
+The root app currently imports only React Native primitives and `react-native-webview`, so the starter UI itself does not require Expo APIs. Native project scaffolding is a separate remaining step.
 
 ## Current repository implementation
-- Expo / React Native starter in root `App.js`.
-- Basic address/search input and embedded `react-native-webview`.
-- Expo targets configured for iOS, Android, and web.
-- Veyra SVG icon source at `assets/veyra-icon.svg`; CI generates `assets/icon.png`.
-- Electron entry point and packaging config in `desktop/`; Windows build packages the web export.
-- SideStore feed at `sidestore-source.json`.
+- Root `App.js`: small React Native browser starter with address entry and WebView.
+- `desktop/`: Electron shell for Windows.
+- `sidestore-source.json`: Veyra SideStore source metadata; its app version list is empty.
+- `assets/veyra-icon.svg`: Veyra icon source.
 
-## Build pipeline
+## Platform status
+- Web: Vite + React Native Web build configuration is being introduced.
+- Windows: Electron packages the web build.
+- iOS: native React Native CLI Xcode project is not yet present.
+- Android: native React Native CLI Gradle project is not yet present.
+- SideStore: no installable IPA is published.
+
+## Build workflow
 Workflow: `.github/workflows/ios-build.yml`
 
-Jobs are configured for:
-- Web export
-- Android APK
-- Unsigned iOS IPA
-- Windows Electron installer
+The workflow is being narrowed to the platforms with committed build scaffolding (web and Windows). iOS and Android jobs must be restored after the native `ios/` and `android/` project folders are generated, committed, and validated.
 
-The prior workflow failed during `actions/setup-node` because npm caching was enabled without a committed lockfile. The updated workflow removes npm caching and uses `npm install --legacy-peer-deps`. A new run was triggered by the latest commits; its result is pending/in progress at last review:
-https://github.com/theDevstars/veyra-browser/actions
-
-The iOS IPA is unsigned and is not directly installable on a standard iPhone without an appropriate signing/provisioning process.
-
-## SideStore
-Source URL:
-`https://raw.githubusercontent.com/theDevstars/veyra-browser/main/sidestore-source.json`
-
-The feed is configured with the Veyra bundle ID and icon metadata, but currently has an empty `versions` list. It is a source/catalog URL, not an install link for an IPA. Add an installable version only after a compatible IPA is successfully published.
+## Imported source archive reviewed
+The supplied `Laturenapp-main 2.zip` was inspected. It contains an older, much fuller mobile app and desktop source, but those older app sources have not yet been merged into this Veyra repository. The uploaded mobile source used Expo modules and needs a deliberate migration before it can replace the current starter.
 
 ## Next milestones
-1. Merge the full mobile `App.js` and desktop HTML/source from the supplied ZIP.
-2. Verify the app builds against Expo 54 dependencies.
-3. Get web and Android CI green.
-4. Confirm the iOS Xcode scheme and generate a valid IPA artifact.
-5. Configure signing or SideStore-compatible installation and publish an IPA release asset.
-6. Verify the SideStore feed and icon in SideStore.
-7. Test the Windows installer and polish platform-specific UI.
-
-## Product backlog
-- Dock-based search/navigation UI and tab controls.
-- Bookmarks/saved pages and history.
-- Separate customization, privacy/security, and extensions settings.
-- Tracking/ad-blocking controls with clearly documented platform limitations.
-- Responsive desktop/mobile layouts and platform-specific polish.
+1. Finish standalone React Native CLI setup and verify the Vite web build.
+2. Generate and commit native iOS and Android project folders.
+3. Port the fuller mobile browser implementation without reintroducing Expo.
+4. Verify Android APK and iOS archive/IPA builds.
+5. Configure signing and publish a SideStore-compatible IPA release asset.
+6. Expand the Windows desktop UI and test the installer.
+7. Implement dock navigation, tabs, bookmarks/history, settings categories, privacy controls, and responsive polish.
 
 ## Platform notes
-- Expo web is a web app usable on Windows, macOS, Linux, and mobile browsers; it is not a native Windows executable.
-- The Electron wrapper packages the web export as a Windows installer.
+- The Electron wrapper packages the web build as a Windows installer; it is not a native Windows browser engine.
 - iOS WebView restrictions limit browser-engine and extension capabilities.
 - Cookie blocking and ad/tracker blocking are best-effort and vary by platform.
 - A SideStore feed does not itself create, sign, or host an IPA.

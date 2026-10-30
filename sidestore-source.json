@@ -1,30 +1,21 @@
 {
-  "name": "Veyra Browser",
-  "subtitle": "A customizable browser for your devices",
-  "description": "Veyra Browser for iPhone and iPad. Updates are published with each GitHub release.",
-  "iconURL": "https://raw.githubusercontent.com/theDevstars/veyra-browser/main/assets/veyra-icon.svg",
+  "name": "Veyra",
+  "subtitle": "A calmer web browser",
+  "description": "Veyra Browser for iPhone and iPad.",
+  "iconURL": "https://raw.githubusercontent.com/theDevstars/veyra-browser/main/assets/icon.png",
   "website": "https://github.com/theDevstars/veyra-browser",
-  "tintColor": "#7867F7",
+  "tintColor": "#DDAF64",
   "apps": [
     {
-      "name": "Veyra Browser",
+      "name": "Veyra",
       "bundleIdentifier": "com.thedevstars.veyra",
       "developerName": "theDevstars",
-      "subtitle": "A customizable browser for your devices",
-      "localizedDescription": "Browse with Veyra Browser, with customizable browsing features and privacy settings.",
-      "iconURL": "https://raw.githubusercontent.com/theDevstars/veyra-browser/main/assets/veyra-icon.svg",
-      "tintColor": "#7867F7",
+      "subtitle": "Browse with a little more calm",
+      "localizedDescription": "Search the web, save pages, and use built-in privacy controls.",
+      "iconURL": "https://raw.githubusercontent.com/theDevstars/veyra-browser/main/assets/icon.png",
+      "tintColor": "#DDAF64",
       "category": "utilities",
-      "versions": [
-        {
-          "version": "1.0.30",
-          "buildVersion": "30",
-          "date": "2026-10-30T01:50:33.847Z",
-          "localizedDescription": "Veyra Browser cross-platform update.",
-          "downloadURL": "https://github.com/theDevstars/veyra-browser/releases/download/veyra-v1.0.30/Veyra-unsigned.ipa",
-          "size": 6526112
-        }
-      ],
+      "versions": [],
       "appPermissions": {
         "entitlements": [],
         "privacy": {

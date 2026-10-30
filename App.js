@@ -1,144 +1,1466 @@
-import React, { useEffect, useRef, useState } from "react";
-import { SafeAreaView, StatusBar, StyleSheet, Text, TextInput, Pressable, View, ScrollView, Switch, Keyboard } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { WebView } from "react-native-webview";
-import Svg, { Path, Circle, Rect } from "react-native-svg";
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  ImageBackground,
+  KeyboardAvoidingView,
+  Linking,
+  Modal,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StatusBar as NativeStatusBar,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { WebView } from 'react-native-webview';
+import * as ImagePicker from 'expo-image-picker';
 
-const PURPLE = "#8170f5";
-const DEFAULTS = { compactDock: false, blockCookies: false, httpsOnly: false, javascript: true };
-
-function Glyph({ name, color = "#d8d4ef", size = 22 }) {
-  const common = { stroke: color, strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", fill: "none" };
-  const paths = {
-    back: <Path {...common} d="M19 12H5m7 7-7-7 7-7" />,
-    forward: <Path {...common} d="M5 12h14m-7-7 7 7-7 7" />,
-    reload: <Path {...common} d="M20 7v5h-5M4.8 16A8 8 0 0 0 19 12M4 17v-5h5M19.2 8A8 8 0 0 0 5 12" />,
-    home: <><Path {...common} d="m3 11 9-8 9 8v9a1 1 0 0 1-1 1h-6v-7h-4v7H4a1 1 0 0 1-1-1z" /></>,
-    bookmark: <Path {...common} d="M6 4.8A1.8 1.8 0 0 1 7.8 3h8.4A1.8 1.8 0 0 1 18 4.8V21l-6-4-6 4z" />,
-    settings: <><Path {...common} d="M12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6Z" /><Path {...common} d="m19.4 13.5 1.1.9-1.1 1.9-1.4-.5a7.8 7.8 0 0 1-1.5.9l-.2 1.5h-2.2l-.4-1.4a7.8 7.8 0 0 1-1.8 0l-.8 1.2-1.9-1.1.5-1.4a7.8 7.8 0 0 1-.9-1.5l-1.5-.2v-2.2l1.4-.4a7.8 7.8 0 0 1 0-1.8l-1.2-.8 1.1-1.9 1.4.5a7.8 7.8 0 0 1 1.5-.9l.2-1.5h2.2l.4 1.4a7.8 7.8 0 0 1 1.8 0l.8-1.2 1.9 1.1-.5 1.4a7.8 7.8 0 0 1 .9 1.5l1.5.2v2.2l-1.4.4a7.8 7.8 0 0 1 0 1.8Z" /></>,
-    shield: <Path {...common} d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z" />,
-    plus: <Path {...common} d="M12 5v14M5 12h14" />,
-    close: <Path {...common} d="m18 6-12 12M6 6l12 12" />,
-    search: <><Circle {...common} cx="10.8" cy="10.8" r="6.8" /><Path {...common} d="m16 16 5 5" /></>
+const BOOKMARKS_KEY = '@veyra/bookmarks-v1';
+const SETTINGS_KEY = '@veyra/settings-v1';
+const BACKGROUND_KEY = '@veyra/background-v1';
+const BIBLES_KEY = '@veyra/api-bibles-v1';
+const SETUP_KEY = '@veyra/setup-complete-v1';
+const MAX_BACKGROUND_CHARS = 1500000;
+const DEFAULT_SETTINGS = {
+  searchEngine: 'DuckDuckGo',
+  theme: 'dark',
+  preferHttps: true,
+  javaScriptEnabled: true,
+  allowPopups: false,
+  privateBrowsing: false,
+  blockThirdPartyCookies: true,
+  blockAds: true,
+  domStorageEnabled: true,
+  showDailyVerse: true,
+  showPrivacySnapshot: true,
+  showBrandTagline: true,
+  compactHome: false,
+  showDockLabels: true,
+  showHeader: true,
+  showSearchBar: false,
+  showNavigationRow: true,
+  showDock: true,
+  showWelcome: true,
+  showBookmarksSection: true,
+  showSearchFooter: true,
+  quickPaths: { DuckDuckGo: false, YouTube: false, Wikipedia: false, 'Bible Gateway': false },
+  verseTranslation: 'web',
+  bibleKey: '',
+  passwordManager: 'Bitwarden',
+  extensionShortcut: 'Google Translate',
+};
+const PASSWORD_MANAGERS = {
+  'Bitwarden': 'https://vault.bitwarden.com',
+  '1Password': 'https://my.1password.com',
+  'Proton Pass': 'https://pass.proton.me',
+  'KeePassXC': 'https://keepassxc.org',
+};
+const EXTENSION_TOOLS = {
+  'Google Translate': 'https://translate.google.com/',
+  'Grammarly': 'https://www.grammarly.com/',
+  'Dark Reader': 'https://darkreader.org/',
+};
+const SEARCH_ENGINES = {
+  DuckDuckGo: 'https://duckduckgo.com/?q=',
+  Google: 'https://www.google.com/search?q=',
+  Bing: 'https://www.bing.com/search?q=',
+};
+// Expanded ad/tracker rules. This is a best-effort WebView filter, not a full
+// network-level content blocker like uBlock Origin. iOS WebView cannot expose
+// every subresource request to React Native, so cosmetic/script filtering helps too.
+const AD_TRACKER_HOSTS = [
+  // Google advertising and measurement
+  'doubleclick.net', 'googlesyndication.com', 'googleadservices.com',
+  'adservice.google.com', 'pagead2.googlesyndication.com', 'googletagservices.com',
+  'google-analytics.com', 'analytics.google.com', 'googletagmanager.com',
+  '2mdn.net', 'admeld.com', 'admob.com', 'adsense.com',
+  // Major ad exchanges, networks and retargeters
+  'adnxs.com', 'adsrvr.org', 'adform.net', 'advertising.com',
+  'criteo.com', ' taboola.com'.trim(), 'outbrain.com', 'revcontent.com',
+  'mgid.com', 'zemanta.com', 'teads.tv', 'smartadserver.com',
+  'openx.net', 'pubmatic.com', 'rubiconproject.com', ' lijit.com'.trim(),
+  'sharethrough.com', 'indexexchange.com', 'casalemedia.com',
+  'bidswitch.net', 'yieldmo.com', '33across.com', 'media.net',
+  'contextweb.com', 'sovrn.com', 'triplelift.com', 'undertone.com',
+  'popads.net', 'propellerads.com', 'popcash.net', ' adsterra.com'.trim(),
+  // Social tracking, analytics and session replay
+  'connect.facebook.net', 'facebook.net', 'pixel.facebook.com',
+  'analytics.tiktok.com', 'ads.tiktok.com', 'snap.licdn.com',
+  'px.ads.linkedin.com', 'bat.bing.com', 'clarity.ms',
+  'hotjar.com', 'fullstory.com', 'mouseflow.com', 'luckyorange.com',
+  'mixpanel.com', 'segment.io', 'segment.com', 'amplitude.com',
+  'heapanalytics.com', 'quantserve.com', 'scorecardresearch.com',
+  'branch.io', 'adjust.com', 'appsflyer.com', 'kochava.com',
+  'amazon-adsystem.com', 'assoc-amazon.com', 'advertising.amazon.com',
+];
+const AD_COSMETIC_SCRIPT = `(function() {
+  if (window.__veyraContentFilterInstalled) return true;
+  window.__veyraContentFilterInstalled = true;
+  var hosts = ["doubleclick.net","googlesyndication.com","googleadservices.com","adservice.google.com","pagead2.googlesyndication.com","googletagservices.com","google-analytics.com","analytics.google.com","googletagmanager.com","2mdn.net","admeld.com","admob.com","adsense.com","adnxs.com","adsrvr.org","adform.net","advertising.com","criteo.com","taboola.com","outbrain.com","revcontent.com","mgid.com","zemanta.com","teads.tv","smartadserver.com","openx.net","pubmatic.com","rubiconproject.com","lijit.com","sharethrough.com","indexexchange.com","casalemedia.com","bidswitch.net","yieldmo.com","33across.com","media.net","contextweb.com","sovrn.com","triplelift.com","undertone.com","popads.net","propellerads.com","popcash.net","adsterra.com","connect.facebook.net","facebook.net","pixel.facebook.com","analytics.tiktok.com","ads.tiktok.com","snap.licdn.com","px.ads.linkedin.com","bat.bing.com","clarity.ms","hotjar.com","fullstory.com","mouseflow.com","luckyorange.com","mixpanel.com","segment.io","segment.com","amplitude.com","heapanalytics.com","quantserve.com","scorecardresearch.com","branch.io","adjust.com","appsflyer.com","kochava.com","amazon-adsystem.com","assoc-amazon.com","advertising.amazon.com"];
+  function blocked(value) {
+    try {
+      var h = new URL(value, location.href).hostname.toLowerCase();
+      return hosts.some(function(host) { return h === host || h.endsWith('.' + host); });
+    } catch (_) { return false; }
+  }
+  var css = [
+    'iframe[src*="doubleclick"],iframe[src*="googlesyndication"],iframe[id*="google_ads"]',
+    '[id^="google_ads"],[id*="ad-slot"],[id*="ad_slot"],[class*="ad-slot"],[class*="ad_slot"]',
+    '[class*="ad-container"],[class*="ad_container"],[class*="advertisement"],[class~="adsbygoogle"]',
+    '[data-ad-slot],[data-ad-client],[data-google-query-id],[aria-label="Advertisement"]',
+    'amp-ad,amp-embed,ins.adsbygoogle,.ad-banner,.ad-wrapper,.sponsored-content'
+  ].join(',') + '{display:none!important;visibility:hidden!important;pointer-events:none!important}';
+  function addStyle() {
+    if (!document.getElementById('__veyra_ad_rules')) {
+      var style = document.createElement('style');
+      style.id = '__veyra_ad_rules';
+      style.textContent = css;
+      (document.head || document.documentElement).appendChild(style);
+    }
+  }
+  function clean(root) {
+    if (!root || !root.querySelectorAll) return;
+    root.querySelectorAll('script[src],iframe[src],img[src],source[src],video[src],audio[src]').forEach(function(el) {
+      if (blocked(el.getAttribute('src'))) el.remove();
+    });
+    addStyle();
+  }
+  // Block script-driven requests to known advertising/analytics hosts.
+  var nativeFetch = window.fetch;
+  if (nativeFetch) window.fetch = function(input, init) {
+    var value = typeof input === 'string' ? input : input && input.url;
+    if (value && blocked(value)) return Promise.reject(new TypeError('Blocked by Veyra content filter'));
+    return nativeFetch.apply(this, arguments);
   };
-  return <Svg width={size} height={size} viewBox="0 0 24 24">{paths[name] || paths.search}</Svg>;
+  var nativeOpen = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function(method, url) {
+    if (blocked(url)) { this.__veyraBlocked = true; return nativeOpen.call(this, method, 'about:blank'); }
+    this.__veyraBlocked = false;
+    return nativeOpen.apply(this, arguments);
+  };
+  var nativeSend = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.send = function() {
+    if (this.__veyraBlocked) { try { this.abort(); } catch (_) {} return; }
+    return nativeSend.apply(this, arguments);
+  };
+  if (navigator.sendBeacon) {
+    var nativeBeacon = navigator.sendBeacon.bind(navigator);
+    navigator.sendBeacon = function(url, data) { return blocked(url) ? false : nativeBeacon(url, data); };
+  }
+  clean(document);
+  new MutationObserver(function(records) {
+    records.forEach(function(record) {
+      record.addedNodes.forEach(function(node) {
+        if (node.nodeType === 1) {
+          if (node.matches && node.matches('[src]') && blocked(node.getAttribute('src'))) node.remove();
+          clean(node);
+        }
+      });
+    });
+  }).observe(document.documentElement, {childList:true,subtree:true});
+  return true;
+})(); true;`;
+
+const QUICK_LINKS = [
+  { title: 'DuckDuckGo', subtitle: 'Private search', url: 'https://duckduckgo.com', mark: 'D', color: '#de5833' },
+  { title: 'YouTube', subtitle: 'Watch', url: 'https://www.youtube.com', mark: '▶', color: '#ff4d4d' },
+  { title: 'Wikipedia', subtitle: 'Explore', url: 'https://www.wikipedia.org', mark: 'W', color: '#7b91bd' },
+  { title: 'Bible Gateway', subtitle: 'Read', url: 'https://www.biblegateway.com', mark: '✦', color: '#efb35f' },
+];
+
+// A 365-day cycle of distinct Bible references (one verse from each chapter).
+// Verse text is loaded and cached from Bible-API when the day changes.
+const DAILY_VERSES = (() => {
+  const books = [
+    ['Genesis',50],['Exodus',40],['Leviticus',27],['Numbers',36],['Deuteronomy',34],
+    ['Joshua',24],['Judges',21],['Ruth',4],['1 Samuel',31],['2 Samuel',24],
+    ['1 Kings',22],['2 Kings',25],['1 Chronicles',29],['2 Chronicles',36],['Ezra',10],
+    ['Nehemiah',13],['Esther',10],['Job',42],['Psalms',150],['Proverbs',31],
+    ['Ecclesiastes',12],['Song of Solomon',8],['Isaiah',66],['Jeremiah',52],['Lamentations',5],
+    ['Ezekiel',48],['Daniel',12],['Hosea',14],['Joel',3],['Amos',9],['Obadiah',1],
+    ['Jonah',4],['Micah',7],['Nahum',3],['Habakkuk',3],['Zephaniah',3],
+    ['Haggai',2],['Zechariah',14],['Malachi',4],['Matthew',28],['Mark',16],
+    ['Luke',24],['John',21],['Acts',28],['Romans',16],['1 Corinthians',16],
+    ['2 Corinthians',13],['Galatians',6],['Ephesians',6],['Philippians',4],['Colossians',4],
+    ['1 Thessalonians',5],['2 Thessalonians',3],['1 Timothy',6],['2 Timothy',4],['Titus',3],
+    ['Philemon',1],['Hebrews',13],['James',5],['1 Peter',5],['2 Peter',3],
+    ['1 John',5],['2 John',1],['3 John',1],['Jude',1],['Revelation',22]
+  ];
+  const references = [];
+  for (const [book, chapters] of books) {
+    for (let chapter = 1; chapter <= chapters && references.length < 365; chapter++) {
+      references.push({ reference: book + ' ' + chapter + ':1', text: '' });
+    }
+    if (references.length === 365) break;
+  }
+  return references;
+})();
+
+const KJV_TEXT = {
+  'Psalm 91:1–2': 'He that dwelleth in the secret place of the most High\nshall abide under the shadow of the Almighty.\n\nI will say of the LORD, He is my refuge and my fortress:\nmy God; in him will I trust.',
+  'Psalm 23:1': 'The LORD is my shepherd;\nI shall not want.',
+  'Psalm 46:1': 'God is our refuge and strength,\na very present help in trouble.',
+  'Psalm 121:1–2': 'I will lift up mine eyes unto the hills,\nfrom whence cometh my help.\nMy help cometh from the LORD,\nwhich made heaven and earth.',
+  'Proverbs 3:5–6': 'Trust in the LORD with all thine heart;\nand lean not unto thine own understanding.\nIn all thy ways acknowledge him,\nand he shall direct thy paths.',
+  'Isaiah 41:10': 'Fear thou not; for I am with thee:\nbe not dismayed; for I am thy God:\nI will strengthen thee; yea, I will help thee;\nyea, I will uphold thee with the right hand of my righteousness.',
+  'Matthew 6:34': 'Take therefore no thought for the morrow: for the morrow shall take thought for the things of itself. Sufficient unto the day is the evil thereof.',
+  'Matthew 11:28': 'Come unto me, all ye that labour and are heavy laden, and I will give you rest.',
+  'John 14:27': 'Peace I leave with you, my peace I give unto you: not as the world giveth, give I unto you. Let not your heart be troubled, neither let it be afraid.',
+  'Romans 8:28': 'And we know that all things work together for good to them that love God, to them who are the called according to his purpose.',
+  'Philippians 4:6–7': 'Be careful for nothing; but in every thing by prayer and supplication with thanksgiving let your requests be made known unto God. And the peace of God, which passeth all understanding, shall keep your hearts and minds through Christ Jesus.',
+  'Joshua 1:9': 'Have not I commanded thee? Be strong and of a good courage; be not afraid, neither be thou dismayed: for the LORD thy God is with thee whithersoever thou goest.',
+  '1 Peter 5:7': 'Casting all your care upon him; for he careth for you.',
+};
+
+const TRANSLATIONS = [
+  { id: 'web', label: 'WEB' },
+  { id: 'kjv', label: 'KJV' },
+  { id: 'bbe', label: 'BBE' },
+  { id: 'oeb-us', label: 'OEB' },
+  { id: 'oeb-cw', label: 'OEB-CW' },
+  { id: 'webbe', label: 'WEBBE' },
+  { id: 'clementine', label: 'Latin' },
+  { id: 'almeida', label: 'Almeida' },
+  { id: 'rccv', label: 'Romanian' },
+];
+const OSIS = {
+  'Psalm 91:1–2': 'PSA.91.1-PSA.91.2',
+  'Psalm 23:1': 'PSA.23.1',
+  'Psalm 46:1': 'PSA.46.1',
+  'Psalm 121:1–2': 'PSA.121.1-PSA.121.2',
+  'Proverbs 3:5–6': 'PRO.3.5-PRO.3.6',
+  'Isaiah 41:10': 'ISA.41.10',
+  'Matthew 6:34': 'MAT.6.34',
+  'Matthew 11:28': 'MAT.11.28',
+  'John 14:27': 'JHN.14.27',
+  'Romans 8:28': 'ROM.8.28',
+  'Philippians 4:6–7': 'PHP.4.6-PHP.4.7',
+  'Joshua 1:9': 'JOS.1.9',
+  '1 Peter 5:7': '1PE.5.7',
+};
+
+async function loadVerse(id, reference, apiKey) {
+  const cacheKey = '@veyra/verse/' + id + '/' + reference;
+  try {
+    const cached = await AsyncStorage.getItem(cacheKey);
+    if (cached) return cached;
+  } catch (_) {}
+  let text = '';
+  try {
+    if (id.indexOf('api:') === 0) {
+      const osis = OSIS[reference];
+      if (!apiKey || !osis) return '';
+      const res = await fetch(
+        'https://api.scripture.api.bible/v1/bibles/' + id.slice(4) + '/passages/' + osis +
+          '?content-type=text&include-notes=false&include-titles=false&include-chapter-numbers=false&include-verse-numbers=false',
+        { headers: { 'api-key': apiKey } }
+      );
+      if (!res.ok) return '';
+      const json = await res.json();
+      text = String((json.data && json.data.content) || '').replace(/[ \t]+/g, ' ').replace(/\n\s+/g, '\n').trim();
+    } else {
+      const res = await fetch('https://bible-api.com/' + reference.replace('–', '-').replace(/ /g, '+') + '?translation=' + id);
+      if (!res.ok) return '';
+      const json = await res.json();
+      text = String(json.text || '').trim();
+    }
+  } catch (_) {
+    return '';
+  }
+  if (text) {
+    try { await AsyncStorage.setItem(cacheKey, text); } catch (_) {}
+  }
+  return text;
+}
+
+function makeTarget(value, engine, preferHttps) {
+  const input = value.trim();
+  if (!input) return null;
+  if (/^![a-z0-9]+(?:\s|$)/i.test(input)) {
+    return SEARCH_ENGINES.DuckDuckGo + encodeURIComponent(input);
+  }
+  if (/^https?:\/\//i.test(input)) {
+    if (preferHttps && /^http:\/\//i.test(input)) {
+      return input.replace(/^http:\/\//i, 'https://');
+    }
+    return input;
+  }
+  if (/^[a-z][a-z0-9+.-]*:/i.test(input)) return null;
+  if (input.includes('.') && !/\s/.test(input)) return 'https://' + input;
+  return (SEARCH_ENGINES[engine] || SEARCH_ENGINES.DuckDuckGo) + encodeURIComponent(input);
+}
+
+function IconButton({ label, glyph, onPress, secondary = false }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => [styles.iconButton, secondary && styles.iconButtonSecondary, pressed && styles.pressed]}
+    >
+      <Text style={[styles.iconGlyph, secondary && styles.iconGlyphSecondary]}>{glyph}</Text>
+    </Pressable>
+  );
+}
+
+function SettingRow({ title, detail, value, onValueChange, light = false }) {
+  return (
+    <View style={styles.settingRow}>
+      <View style={styles.settingCopy}>
+        <Text style={[styles.settingTitle, light && { color: '#172033' }]}>{title}</Text>
+        <Text style={[styles.settingDetail, light && { color: '#66738a' }]}>{detail}</Text>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onValueChange}
+        trackColor={{ false: '#39445b', true: '#d99e4f' }}
+        thumbColor={value ? '#fff3d8' : '#d0d5df'}
+        accessibilityLabel={title}
+      />
+    </View>
+  );
 }
 
 export default function App() {
   const web = useRef(null);
-  const [address, setAddress] = useState("");
-  const [url, setUrl] = useState("");
-  const [opened, setOpened] = useState(false);
-  const [canBack, setCanBack] = useState(false);
-  const [canForward, setCanForward] = useState(false);
-  const [panel, setPanel] = useState("home");
-  const [settingsSection, setSettingsSection] = useState("main");
-  const [saved, setSaved] = useState([]);
-  const [prefs, setPrefs] = useState(DEFAULTS);
+  const [address, setAddress] = useState('');
+  const [url, setUrl] = useState(null);
+  const [pageTitle, setPageTitle] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [bookmarks, setBookmarks] = useState([]);
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const isLight = settings.theme === 'light';
+  const palette = isLight
+    ? { bg: '#f3f5f9', surface: '#ffffff', surfaceAlt: '#e9edf5', border: '#d5dce8', text: '#172033', muted: '#66738a', accent: '#4169d8', accentSoft: '#e5ebff', dock: 'rgba(255,255,255,0.97)' }
+    : { bg: '#0b1220', surface: '#111b2c', surfaceAlt: '#172238', border: '#293752', text: '#f2f5fa', muted: '#93a2b8', accent: '#e8b76d', accentSoft: '#26354d', dock: 'rgba(23,34,56,0.97)' };
+  const [passwordMenuOpen, setPasswordMenuOpen] = useState(false);
+  const [extensionMenuOpen, setExtensionMenuOpen] = useState(false);
+  const [background, setBackground] = useState(null);
+  const [webKey, setWebKey] = useState(0);
+  const [apiBibles, setApiBibles] = useState([]);
+  const [remote, setRemote] = useState({ key: '', text: '', failed: false, loading: false });
+  const [bookmarksVisible, setBookmarksVisible] = useState(false);
+  const [settingsVisible, setSettingsVisible] = useState(false);
+  const [settingsCategory, setSettingsCategory] = useState(null);
+  const [setupVisible, setSetupVisible] = useState(false);
+  const [editorVisible, setEditorVisible] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [bookmarkName, setBookmarkName] = useState('');
+  const [today, setToday] = useState(() => new Date());
+  const [bookmarkUrl, setBookmarkUrl] = useState('');
 
   useEffect(() => {
-    (async () => {
-      try {
-        const [s, p] = await Promise.all([AsyncStorage.getItem("veyra:saved"), AsyncStorage.getItem("veyra:prefs")]);
-        if (s) setSaved(JSON.parse(s));
-        if (p) setPrefs({ ...DEFAULTS, ...JSON.parse(p) });
-      } catch (_) {}
-    })();
+    let active = true;
+    Promise.all([
+      AsyncStorage.getItem(BOOKMARKS_KEY),
+      AsyncStorage.getItem(SETTINGS_KEY),
+      AsyncStorage.getItem(BACKGROUND_KEY),
+      AsyncStorage.getItem(BIBLES_KEY),
+      AsyncStorage.getItem(SETUP_KEY),
+    ])
+      .then(([savedBookmarks, savedSettings, savedBackground, savedBibles, setupComplete]) => {
+        if (!active) return;
+        if (!setupComplete) setSetupVisible(true);
+        if (savedBibles) {
+          try { setApiBibles(JSON.parse(savedBibles)); } catch (_) {}
+        }
+        if (savedBookmarks) {
+          try { setBookmarks(JSON.parse(savedBookmarks)); } catch (_) { setBookmarks([]); }
+        }
+        let oldBackground = null;
+        if (savedSettings) {
+          try {
+            const parsed = JSON.parse(savedSettings);
+            if (parsed.extensionShortcut === 'Chrome Web Store') parsed.extensionShortcut = 'Google Translate';
+            oldBackground = parsed.backgroundImage || null;
+            delete parsed.backgroundImage;
+            const legacy = { WEB: 'web', KJV: 'kjv' };
+            const saved = parsed.verseTranslation;
+            if (legacy[saved]) parsed.verseTranslation = legacy[saved];
+            else if (saved && !TRANSLATIONS.some((item) => item.id === saved) && String(saved).indexOf('api:') !== 0) parsed.verseTranslation = 'web';
+            setSettings({ ...DEFAULT_SETTINGS, ...parsed, quickPaths: { ...DEFAULT_SETTINGS.quickPaths, ...(parsed.quickPaths || {}) } });
+          } catch (_) {}
+        }
+        if (savedBackground) {
+          setBackground(savedBackground);
+        } else if (oldBackground && oldBackground.length <= MAX_BACKGROUND_CHARS) {
+          setBackground(oldBackground);
+          AsyncStorage.setItem(BACKGROUND_KEY, oldBackground).catch(() => {});
+        }
+      })
+      .catch(() => {});
+    return () => { active = false; };
   }, []);
 
-  const navigate = (raw = address) => {
-    const value = raw.trim();
-    if (!value) return;
-    const hasProtocol = value.startsWith("https://") || value.startsWith("http://");
-    const target = hasProtocol ? (prefs.httpsOnly && value.startsWith("http://") ? "https://" + value.slice(7) : value) : value.includes(".") && !value.includes(" ") ? "https://" + value : "https://www.google.com/search?q=" + encodeURIComponent(value);
-    Keyboard.dismiss();
+  useEffect(() => {
+    const open = (link) => {
+      if (link && /^https?:\/\//i.test(link)) {
+        setAddress(link);
+        setUrl(link);
+        setPageTitle('');
+      }
+    };
+    Linking.getInitialURL().then(open).catch(() => {});
+    const sub = Linking.addEventListener('url', (event) => open(event.url));
+    return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
+    const now = new Date();
+    const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1);
+    const timer = setTimeout(() => setToday(new Date()), Math.max(1000, nextMidnight.getTime() - now.getTime()));
+    return () => clearTimeout(timer);
+  }, [today]);
+
+  const dayOfYear = Math.floor(
+    (Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()) - Date.UTC(today.getFullYear(), 0, 1)) / 86400000
+  );
+  const dailyVerse = DAILY_VERSES[dayOfYear % DAILY_VERSES.length];
+  const tr = settings.verseTranslation || 'web';
+  const trKey = tr + '|' + dailyVerse.reference;
+  const trMeta = TRANSLATIONS.find((item) => item.id === tr) || apiBibles.find((item) => item.id === tr);
+  const trLabel = trMeta ? trMeta.label : 'WEB';
+  const showKjv = tr === 'kjv' && !!KJV_TEXT[dailyVerse.reference];
+  const remoteReady = !(tr === 'kjv' && !!KJV_TEXT[dailyVerse.reference]) && remote.key === trKey && !!remote.text;
+  const verseText = showKjv ? KJV_TEXT[dailyVerse.reference] : remoteReady ? remote.text : (dailyVerse.text || (remote.loading && remote.key === trKey ? 'Loading today’s verse…' : 'Connect to the internet to load today’s verse.'));
+  const verseVersion = showKjv ? 'KJV' : remoteReady ? trLabel : 'WEB';
+  const verseNote = remote.key === trKey && remote.loading
+    ? 'Loading ' + trLabel + '…'
+    : remote.key === trKey && remote.failed
+      ? 'Couldn’t load ' + trLabel + '. Showing WEB.'
+      : '';
+  const linkVersion = tr === 'web' ? 'WEB' : tr === 'kjv' ? 'KJV' : tr.indexOf('api:') === 0 && trMeta ? (trMeta.label === 'NASB' ? 'NASB1995' : trMeta.label) : '';
+
+  useEffect(() => {
+    if (tr === 'kjv' && KJV_TEXT[dailyVerse.reference]) {
+      setRemote({ key: trKey, text: '', failed: false, loading: false });
+      return undefined;
+    }
+    let active = true;
+    setRemote({ key: trKey, text: '', failed: false, loading: true });
+    loadVerse(tr, dailyVerse.reference, settings.bibleKey).then((text) => {
+      if (active) setRemote({ key: trKey, text, failed: !text, loading: false });
+    });
+    return () => { active = false; };
+  }, [tr, dailyVerse.reference, settings.bibleKey]);
+
+  const updateBookmarks = async (next) => {
+    setBookmarks(next);
+    try { await AsyncStorage.setItem(BOOKMARKS_KEY, JSON.stringify(next)); } catch (_) {}
+  };
+
+  const moveBookmark = async (index, offset) => {
+    const nextIndex = index + offset;
+    if (nextIndex < 0 || nextIndex >= bookmarks.length) return;
+    const next = [...bookmarks];
+    [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+    await updateBookmarks(next);
+  };
+
+  const finishSetup = async (configure) => {
+    setSetupVisible(false);
+    try { await AsyncStorage.setItem(SETUP_KEY, 'yes'); } catch (_) {}
+    if (configure) setSettingsVisible(true);
+  };
+
+  const updateSetting = async (key, value) => {
+    const next = { ...settings, [key]: value };
+    setSettings(next);
+    try { await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next)); } catch (_) {}
+  };
+
+  const setInterfacePreset = async (visible) => {
+    const next = {
+      ...settings,
+      showHeader: visible,
+      showSearchBar: visible,
+      showNavigationRow: visible,
+      showDock: visible,
+      showWelcome: visible,
+      showDailyVerse: visible,
+      showPrivacySnapshot: visible,
+      showBrandTagline: visible,
+      showDockLabels: visible,
+      showBookmarksSection: visible,
+      showSearchFooter: visible,
+      quickPaths: visible
+        ? { DuckDuckGo: true, YouTube: true, Wikipedia: true, 'Bible Gateway': true }
+        : { DuckDuckGo: false, YouTube: false, Wikipedia: false, 'Bible Gateway': false },
+    };
+    setSettings(next);
+    try { await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next)); } catch (_) {}
+  };
+
+  const saveBackground = async (value) => {
+    try {
+      if (value) await AsyncStorage.setItem(BACKGROUND_KEY, value);
+      else await AsyncStorage.removeItem(BACKGROUND_KEY);
+      setBackground(value);
+    } catch (_) {
+      Alert.alert('Could not save the background', 'The photo may be too large. Try a different photo.');
+    }
+  };
+
+  const navigate = (value = address) => {
+    const target = makeTarget(value, settings.searchEngine, settings.preferHttps);
+    if (!target) {
+      Alert.alert('Can’t open that address', 'Enter a web address or a search term.');
+      return;
+    }
     setAddress(target);
     setUrl(target);
-    setOpened(true);
-    setPanel("home");
+    setPageTitle('');
   };
 
-  const togglePref = async (key, value) => {
-    const next = { ...prefs, [key]: value };
-    setPrefs(next);
-    try { await AsyncStorage.setItem("veyra:prefs", JSON.stringify(next)); } catch (_) {}
+  const guardRequest = (request) => {
+    const next = request.url;
+    if (next === 'about:blank') return true;
+    if (!/^https?:\/\//i.test(next)) return false;
+    if (settings.blockAds) {
+      try {
+        const hostname = new URL(next).hostname.toLowerCase();
+        if (AD_TRACKER_HOSTS.some((host) => hostname === host || hostname.endsWith('.' + host))) return false;
+      } catch (_) {}
+    }
+    if (settings.preferHttps && /^http:\/\//i.test(next)) {
+      if (request.isTopFrame !== false) {
+        const upgraded = next.replace(/^http:\/\//i, 'https://');
+        setAddress(upgraded);
+        setUrl(upgraded);
+      }
+      return false;
+    }
+    return true;
   };
 
-  const saveCurrent = async () => {
-    if (!url) return;
-    const next = saved.some(x => x.url === url) ? saved : [{ url, title: url.replace(/^https?:\/\//, "").split("/")[0] }, ...saved];
-    setSaved(next);
-    try { await AsyncStorage.setItem("veyra:saved", JSON.stringify(next)); } catch (_) {}
-    setPanel("saved");
+  const loadApiBibles = async () => {
+    const key = (settings.bibleKey || '').trim();
+    if (!key) {
+      Alert.alert('Add your API.Bible key first', 'Paste the key from your free API.Bible account into the box above.');
+      return;
+    }
+    try {
+      const res = await fetch('https://api.scripture.api.bible/v1/bibles?language=eng', { headers: { 'api-key': key } });
+      if (!res.ok) throw new Error('bad status');
+      const json = await res.json();
+      const list = (json.data || [])
+        .map((bible) => ({ id: 'api:' + bible.id, label: bible.abbreviationLocal || bible.abbreviation || bible.name }))
+        .slice(0, 60);
+      setApiBibles(list);
+      await AsyncStorage.setItem(BIBLES_KEY, JSON.stringify(list));
+      Alert.alert('Versions loaded', list.length + ' versions are available with your key.');
+    } catch (_) {
+      Alert.alert('Could not load versions', 'Check your API.Bible key and your connection.');
+    }
   };
 
-  const openSaved = item => { setAddress(item.url); setUrl(item.url); setOpened(true); setPanel("home"); };
-  const goHome = () => { setOpened(false); setUrl(""); setAddress(""); setPanel("home"); };
-  const row = (icon, title, subtitle, onPress) => <Pressable key={title} style={s.menuRow} onPress={onPress}><View style={s.menuIcon}><Glyph name={icon} color={PURPLE} size={20} /></View><View style={{ flex: 1 }}><Text style={s.menuTitle}>{title}</Text>{!!subtitle && <Text style={s.menuSub}>{subtitle}</Text>}</View><Text style={s.chevron}>›</Text></Pressable>;
-  const setting = (title, subtitle, key) => <View key={key} style={s.settingRow}><View style={{ flex: 1, paddingRight: 12 }}><Text style={s.menuTitle}>{title}</Text><Text style={s.menuSub}>{subtitle}</Text></View><Switch value={!!prefs[key]} onValueChange={v => togglePref(key, v)} trackColor={{ false: "#39364c", true: "#6556c9" }} thumbColor={prefs[key] ? "#fff" : "#b5b0c9"} /></View>;
+  const clearApiBibles = async () => {
+    setApiBibles([]);
+    try { await AsyncStorage.removeItem(BIBLES_KEY); } catch (_) {}
+    if (String(settings.verseTranslation).indexOf('api:') === 0) updateSetting('verseTranslation', 'web');
+  };
 
-  return (
-    <SafeAreaView style={s.root}>
-      <StatusBar barStyle="light-content" backgroundColor="#10101a" />
-      {opened && panel === "home" ? (
-        <WebView ref={web} source={{ uri: url }} style={s.web} onNavigationStateChange={st => { setAddress(st.url); setUrl(st.url); setCanBack(st.canGoBack); setCanForward(st.canGoForward); }} javaScriptEnabled={prefs.javascript} thirdPartyCookiesEnabled={!prefs.blockCookies} sharedCookiesEnabled={!prefs.blockCookies} allowsBackForwardNavigationGestures />
-      ) : (
-        <View style={s.content}>
-          <View style={s.topBrand}><View><Text style={s.brand}>veyra</Text><Text style={s.brandCaption}>BROWSER</Text></View></View>
-          {panel === "home" && <ScrollView contentContainerStyle={s.home}>
-            <View style={s.heroMark}><Text style={s.heroV}>V</Text></View>
-            <Text style={s.welcome}>Browse your way.</Text>
-            <Text style={s.subtitle}>A calmer space for everything online.</Text>
-            <View style={s.quickActions}>
-              <Pressable style={s.quickCard} onPress={() => setPanel("saved")}><Glyph name="bookmark" color={PURPLE} size={22} /><Text style={s.quickTitle}>Saved pages</Text><Text style={s.quickSub}>{saved.length} saved</Text></Pressable>
-              <Pressable style={s.quickCard} onPress={() => { setPanel("settings"); setSettingsSection("main"); }}><Glyph name="settings" color={PURPLE} size={22} /><Text style={s.quickTitle}>Customize</Text><Text style={s.quickSub}>Make it yours</Text></Pressable>
+  const goHome = () => {
+    setUrl(null);
+    setAddress('');
+    setPageTitle('');
+    setLoading(false);
+  };
+
+  const openBookmarkEditor = (bookmark = null) => {
+    setEditingId(bookmark ? bookmark.id : null);
+    setBookmarkName(bookmark ? bookmark.name : (pageTitle || 'Saved page'));
+    setBookmarkUrl(bookmark ? bookmark.url : (url || ''));
+    setBookmarksVisible(false);
+    setEditorVisible(true);
+  };
+
+  const saveBookmark = async () => {
+    const target = makeTarget(bookmarkUrl, settings.searchEngine, settings.preferHttps);
+    const name = bookmarkName.trim();
+    if (!name || !target) {
+      Alert.alert('Add a name and web address', 'Both fields are needed to save a page.');
+      return;
+    }
+    const item = { id: editingId || String(Date.now()), name, url: target };
+    const next = editingId
+      ? bookmarks.map((bookmark) => bookmark.id === editingId ? item : bookmark)
+      : [item, ...bookmarks];
+    await updateBookmarks(next);
+    setEditorVisible(false);
+  };
+
+  const deleteBookmark = (bookmark) => {
+    Alert.alert('Remove saved page?', '“' + bookmark.name + '” will be removed from Veyra.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          await updateBookmarks(bookmarks.filter((item) => item.id !== bookmark.id));
+          setEditorVisible(false);
+        },
+      },
+    ]);
+  };
+
+  const openSavedPage = (bookmark) => {
+    setBookmarksVisible(false);
+    setAddress(bookmark.url);
+    setUrl(bookmark.url);
+    setPageTitle(bookmark.name);
+  };
+
+  const chooseBackground = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Photo access needed', 'Allow Veyra to choose a photo for your home background.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        base64: true,
+        quality: 0.4,
+      });
+      const image = result.assets && result.assets[0];
+      if (!result.canceled && image?.base64) {
+        const data = 'data:image/jpeg;base64,' + image.base64;
+        if (data.length > MAX_BACKGROUND_CHARS) {
+          Alert.alert('That photo is too large', 'Choose a smaller photo or crop it more tightly.');
+          return;
+        }
+        await saveBackground(data);
+      }
+    } catch (_) {
+      Alert.alert('Could not set background', 'Please choose another photo and try again.');
+    }
+  };
+
+  const clearBrowserData = () => {
+    const message = Platform.OS === 'android'
+      ? 'This clears cached website files and the current browser history. Your saved pages stay in Veyra.'
+      : 'This closes the current page and clears the WebView history. Private-session cookie and site-data behavior can vary by iOS version. Your saved pages stay in Veyra.';
+    Alert.alert('Clear browsing history?', message, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Clear',
+        style: 'destructive',
+        onPress: () => {
+          const view = web.current;
+          if (view && typeof view.clearCache === 'function') view.clearCache(true);
+          if (view && typeof view.clearHistory === 'function') view.clearHistory();
+          setWebKey((key) => key + 1);
+          setAddress('');
+          setUrl(null);
+        },
+      },
+    ]);
+  };
+
+  const renderHome = () => (
+    <ScrollView style={[styles.homeScroll, { backgroundColor: palette.bg }]} contentContainerStyle={[styles.homeContent, settings.compactHome && styles.homeContentCompact]} keyboardShouldPersistTaps="handled">
+      {settings.showWelcome !== false && <View style={styles.welcomeBlock}>
+        <Text style={styles.eyebrow}>YOUR SPACE ON THE WEB</Text>
+        <Text style={[styles.welcomeTitle, settings.compactHome && styles.welcomeTitleCompact]}>A little light{ '\n' }for the way ahead.</Text>
+        <Text style={[styles.welcomeBody, { color: palette.muted }]}>Search, read, and explore at your own pace.</Text>
+      </View>}
+
+      {settings.showDailyVerse && (
+        <View style={[styles.verseCard, { backgroundColor: palette.surfaceAlt, borderColor: palette.border }]}>
+          <View style={styles.verseTopline}>
+            <View style={styles.verseLabelWrap}>
+              <Text style={styles.verseSpark}>✦</Text>
+              <Text style={styles.verseLabel}>TODAY’S VERSE</Text>
             </View>
-          </ScrollView>}
-          {panel === "saved" && <ScrollView contentContainerStyle={s.panelBody}><View style={s.panelHeading}><Pressable onPress={() => setPanel("home")}><Text style={s.backText}>‹ Home</Text></Pressable><Text style={s.panelTitle}>Saved pages</Text></View>{saved.length === 0 ? <Text style={s.empty}>Pages you save will appear here.</Text> : saved.map((item, i) => <Pressable key={item.url + i} style={s.savedRow} onPress={() => openSaved(item)}><Glyph name="bookmark" color={PURPLE} /><View style={{ flex: 1, marginLeft: 12 }}><Text style={s.menuTitle}>{item.title}</Text><Text style={s.menuSub} numberOfLines={1}>{item.url}</Text></View><Pressable onPress={async () => { const next = saved.filter(x => x.url !== item.url); setSaved(next); await AsyncStorage.setItem("veyra:saved", JSON.stringify(next)); }}><Glyph name="close" size={18} /></Pressable></Pressable>)}</ScrollView>}
-          {panel === "settings" && <ScrollView contentContainerStyle={s.panelBody}>
-            <View style={s.panelHeading}><Pressable onPress={() => settingsSection === "main" ? setPanel("home") : setSettingsSection("main")}><Text style={s.backText}>‹ {settingsSection === "main" ? "Home" : "Settings"}</Text></Pressable><Text style={s.panelTitle}>{settingsSection === "main" ? "Settings" : settingsSection[0].toUpperCase() + settingsSection.slice(1)}</Text></View>
-            {settingsSection === "main" ? <>{row("settings", "Customization", "Theme and browser appearance", () => setSettingsSection("customization"))}{row("shield", "Security & privacy", "Cookies, tracking and site controls", () => setSettingsSection("security"))}{row("plus", "Extensions", "Extension support and management", () => setSettingsSection("extensions"))}</> : null}
-            {settingsSection === "customization" && <>{setting("Compact dock", "Use a smaller bottom toolbar", "compactDock")}</>}
-            {settingsSection === "security" && <>{setting("Limit third-party cookies", "Restricts third-party cookies where the platform WebView supports it", "blockCookies")}<View style={s.infoCard}><Text style={s.menuTitle}>Tracking protection</Text><Text style={s.menuSub}>Advanced network-level tracker blocking is not active yet. It will be added in a later security update.</Text></View>{setting("HTTPS preference", "Prefer secure HTTPS addresses", "httpsOnly")}{setting("JavaScript", "Allow websites to run JavaScript", "javascript")}</>}
-            {settingsSection === "extensions" && <View style={s.infoCard}><Text style={s.menuTitle}>Extensions are coming</Text><Text style={s.menuSub}>The extension manager will be added after the core browser controls are restored.</Text></View>}
-          </ScrollView>}
+            <Text style={styles.verseReference}>{dailyVerse.reference.toUpperCase()} · {verseVersion}</Text>
+          </View>
+          <Text style={[styles.verseText, { color: isLight ? '#263248' : '#f4f0e7' }]}>{verseText}</Text>
+          {verseNote ? <Text style={styles.verseNote}>{verseNote}</Text> : null}
+          <Pressable
+            onPress={() => navigate('https://www.biblegateway.com/passage/?search=' + encodeURIComponent(dailyVerse.reference) + (linkVersion ? '&version=' + linkVersion : ''))}
+            style={({ pressed }) => [styles.verseSourceButton, pressed && styles.pressed]}
+            accessibilityRole="link"
+            accessibilityLabel={'Read ' + dailyVerse.reference + ' in ' + trLabel + ' on BibleGateway'}
+          >
+            <Text style={styles.verseSourceText}>Read in {trLabel} on BibleGateway ↗</Text>
+          </Pressable>
         </View>
       )}
-      <View style={[s.dock, prefs.compactDock && s.dockCompact]}>
-        <View style={s.addressBar}><Pressable onPress={() => opened ? web.current?.reload() : null} style={s.addressIcon}><Glyph name="search" size={18} color="#a9a4c0" /></Pressable><TextInput value={address} onChangeText={setAddress} onSubmitEditing={() => navigate()} autoCapitalize="none" autoCorrect={false} keyboardType="url" placeholder="Search or enter address" placeholderTextColor="#88849d" style={s.input} returnKeyType="go" /><Pressable onPress={() => navigate()} style={s.go}><Text style={s.goText}>Go</Text></Pressable></View>
-        <View style={s.dockActions}>
-          <Pressable style={s.dockButton} onPress={() => canBack && web.current?.goBack()}><Glyph name="back" color={canBack ? "#eeeaff" : "#625e75"} /></Pressable>
-          <Pressable style={s.dockButton} onPress={() => canForward && web.current?.goForward()}><Glyph name="forward" color={canForward ? "#eeeaff" : "#625e75"} /></Pressable>
-          <Pressable style={s.dockButton} onPress={goHome}><Glyph name="home" /></Pressable>
-          <Pressable style={s.dockButton} onPress={saveCurrent}><Glyph name="bookmark" color={panel === "saved" ? PURPLE : "#d8d4ef"} /></Pressable>
-          <Pressable style={s.dockButton} onPress={() => { setPanel("settings"); setSettingsSection("main"); }}><Glyph name="settings" /></Pressable>
+
+      {QUICK_LINKS.some((item) => settings.quickPaths && settings.quickPaths[item.title]) && (
+        <>
+          <View style={styles.sectionHeading}>
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>Quick paths</Text>
+            <Text style={[styles.sectionHint, { color: palette.muted }]}>A few good places to begin</Text>
+          </View>
+          <View style={styles.quickGrid}>
+            {QUICK_LINKS.filter((item) => settings.quickPaths && settings.quickPaths[item.title]).map((item) => (
+              <Pressable key={item.title} onPress={() => navigate(item.url)} style={({ pressed }) => [styles.quickCard, pressed && styles.pressed]}>
+                <View style={[styles.quickMark, { backgroundColor: item.color + '24' }]}>
+                  <Text style={[styles.quickMarkText, { color: item.color }]}>{item.mark}</Text>
+                </View>
+                <View style={styles.quickCopy}>
+                  <Text style={styles.quickTitle}>{item.title}</Text>
+                  <Text style={styles.quickSubtitle}>{item.subtitle}</Text>
+                </View>
+                <Text style={styles.quickArrow}>›</Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      )}
+
+      {settings.showPrivacySnapshot !== false && <View style={styles.privacySnapshot}>
+        <View style={styles.privacySnapshotIcon}><Text style={styles.privacySnapshotGlyph}>✦</Text></View>
+        <View style={styles.privacySnapshotCopy}>
+          <Text style={styles.privacySnapshotTitle}>Your privacy, at a glance</Text>
+          <Text style={styles.privacySnapshotBody}>
+            {settings.privateBrowsing ? 'Private browsing is on for this session.' : 'Private browsing is off.'}
+            {' '}{settings.blockThirdPartyCookies ? 'Third-party cookies are blocked.' : 'Third-party cookies are allowed.'}
+          </Text>
+        </View>
+        <Pressable onPress={() => setSettingsVisible(true)} accessibilityRole="button" accessibilityLabel="Open privacy settings" style={styles.privacySnapshotAction}>
+          <Text style={styles.privacySnapshotActionText}>Review</Text>
+        </Pressable>
+      </View>}
+      {settings.showBookmarksSection !== false && <><View style={styles.sectionHeading}>
+        <Text style={[styles.sectionTitle, { color: palette.text }]}>Your bookmarks</Text>
+        <View style={styles.homeBookmarkActions}>
+          <Pressable onPress={() => openBookmarkEditor()}><Text style={styles.seeAll}>＋ Add</Text></Pressable>
+          <Pressable onPress={() => setBookmarksVisible(true)}><Text style={styles.seeAll}>Manage</Text></Pressable>
         </View>
       </View>
-    </SafeAreaView>
+      {bookmarks.length === 0 && (
+        <Pressable onPress={() => openBookmarkEditor()} style={styles.bookmarkEmptyHome}>
+          <Text style={styles.bookmarkEmptyText}>＋ Add a bookmark to your start page</Text>
+        </Pressable>
+      )}
+      {bookmarks.map((item) => (
+        <Pressable key={item.id} onPress={() => openSavedPage(item)} style={[styles.savedHomeRow, { backgroundColor: palette.surfaceAlt, borderColor: palette.border, borderWidth: 1 }]}>
+          <Text style={styles.savedHomeMark}>↗</Text>
+          <View style={styles.savedHomeCopy}>
+            <Text numberOfLines={1} style={[styles.savedHomeTitle, { color: palette.text }]}>{item.name}</Text>
+            <Text numberOfLines={1} style={[styles.savedHomeUrl, { color: palette.muted }]}>{item.url.replace(/^https?:\/\//, '')}</Text>
+          </View>
+          <Text style={styles.quickArrow}>›</Text>
+        </Pressable>
+      ))}
+      </>}
+      {settings.showSearchFooter !== false && <Text style={styles.footerNote}>SEARCH POWERED BY {settings.searchEngine.toUpperCase()}</Text>}
+    </ScrollView>
+  );
+
+  return (
+    <ImageBackground
+      source={background ? { uri: background } : undefined}
+      style={[styles.root, { backgroundColor: palette.bg }]}
+      imageStyle={styles.backgroundImageStyle}
+      resizeMode="cover"
+    >
+    <SafeAreaView style={[styles.safeRoot, { backgroundColor: palette.bg }, Platform.OS === 'android' && { paddingTop: NativeStatusBar.currentHeight || 0 }]}>
+      <NativeStatusBar barStyle={isLight ? 'dark-content' : 'light-content'} backgroundColor={palette.bg} />
+      {!url && settings.showHeader !== false && (
+      <View style={[styles.header, { backgroundColor: palette.bg }]}>
+        <View style={styles.brand}>
+          <Image source={require('./assets/icon.png')} style={styles.brandIcon} />
+          <View>
+            <Text style={[styles.brandName, { color: palette.text }]}>Veyra</Text>
+            {settings.showBrandTagline !== false && <Text style={[styles.brandTagline, { color: palette.muted }]}>Browse with a little more calm</Text>}
+          </View>
+        </View>
+      </View>
+      )}
+
+      {!url && settings.showNavigationRow !== false && (
+      <View style={styles.navRow}>
+        <IconButton label="Go back" glyph="‹" onPress={() => web.current?.goBack()} secondary />
+        <IconButton label="Go forward" glyph="›" onPress={() => web.current?.goForward()} secondary />
+        <IconButton label="Home" glyph="⌂" onPress={goHome} secondary />
+        {url ? (
+          <Pressable onPress={() => openBookmarkEditor()} style={({ pressed }) => [styles.saveCurrentButton, pressed && styles.pressed]}>
+            <Text style={styles.saveCurrentGlyph}>＋</Text>
+            <Text style={styles.saveCurrentText}>Save page</Text>
+          </Pressable>
+        ) : (
+          <View style={styles.searchHint}><Text style={styles.searchHintText}>Search with {settings.searchEngine}</Text></View>
+        )}
+      </View>
+      )}
+
+      {loading && <ActivityIndicator color={palette.accent} style={styles.progress} />}
+      {url ? (
+        <WebView
+          key={webKey + (settings.privateBrowsing ? '-p' : '-n')}
+          ref={web}
+          source={{ uri: url }}
+          incognito={settings.privateBrowsing}
+          onLoadStart={() => setLoading(true)}
+          onLoadEnd={() => setLoading(false)}
+          onNavigationStateChange={(state) => {
+            if (state.url) setAddress(state.url);
+            if (state.title) setPageTitle(state.title);
+          }}
+          onShouldStartLoadWithRequest={guardRequest}
+          javaScriptEnabled={settings.javaScriptEnabled}
+          injectedJavaScriptBeforeContentLoaded={settings.blockAds ? AD_COSMETIC_SCRIPT : undefined}
+          domStorageEnabled={settings.domStorageEnabled}
+          javaScriptCanOpenWindowsAutomatically={settings.allowPopups}
+          setSupportMultipleWindows={settings.allowPopups}
+          allowFileAccess={false}
+          allowUniversalAccessFromFileURLs={false}
+          mixedContentMode={settings.preferHttps ? 'never' : 'compatibility'}
+          thirdPartyCookiesEnabled={!settings.blockThirdPartyCookies}
+          sharedCookiesEnabled={false}
+          allowsBackForwardNavigationGestures
+          style={styles.web}
+        />
+      ) : renderHome()}
+
+      {settings.showDock !== false ? <View style={[styles.bottomDock, url ? styles.bottomDockBrowsing : styles.bottomDockHome]} accessibilityLabel="Browser dock">
+        <Pressable onPress={goHome} style={({ pressed }) => [styles.dockItem, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Home">
+          <Text style={styles.dockGlyph}>⌂</Text>
+        </Pressable>
+        {url ? (
+          <View style={[styles.safariAddressBar, { backgroundColor: palette.bg, borderColor: palette.border }]}>
+            <Text style={styles.safariLock}>⌑</Text>
+            <TextInput
+              value={address}
+              onChangeText={setAddress}
+              onSubmitEditing={() => navigate()}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType={Platform.OS === 'ios' ? 'web-search' : 'default'}
+              returnKeyType="go"
+              selectTextOnFocus
+              placeholder="Search or enter website"
+              placeholderTextColor="#8995aa"
+              style={styles.safariAddressInput}
+              accessibilityLabel="Search or enter a website"
+            />
+            <Pressable onPress={() => web.current?.reload()} style={styles.safariReload} accessibilityRole="button" accessibilityLabel="Reload page">
+              <Text style={styles.safariReloadGlyph}>↻</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={[styles.safariAddressBar, styles.homeDockSearch, { backgroundColor: palette.bg, borderColor: palette.border }]}>
+            <Text style={styles.safariLock}>⌕</Text>
+            <TextInput
+              value={address}
+              onChangeText={setAddress}
+              onSubmitEditing={() => navigate()}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType={Platform.OS === 'ios' ? 'web-search' : 'default'}
+              returnKeyType="search"
+              selectTextOnFocus
+              placeholder="Search or enter website"
+              placeholderTextColor="#8995aa"
+              style={styles.safariAddressInput}
+              accessibilityLabel="Search or enter a website"
+            />
+            <Pressable onPress={() => navigate()} style={styles.safariReload} accessibilityRole="button" accessibilityLabel="Search">
+              <Text style={styles.safariReloadGlyph}>→</Text>
+            </Pressable>
+          </View>
+        )}
+        {url && (
+          <Pressable onPress={() => openBookmarkEditor()} style={({ pressed }) => [styles.dockItem, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Save current page">
+            <Text style={styles.dockGlyph}>＋</Text>
+          </Pressable>
+        )}
+        <Pressable onPress={() => setBookmarksVisible(true)} style={({ pressed }) => [styles.dockItem, styles.dockIconTile, { backgroundColor: isLight ? '#e5ebff' : '#26354d' }, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Saved pages">
+          <Text style={[styles.dockGlyph, { color: isLight ? '#4169d8' : '#b9c9ff', fontSize: 21, fontWeight: '800' }]}>▤</Text>{!url && settings.showDockLabels !== false && <Text style={[styles.dockLabel, { color: palette.muted }]}>Saved</Text>}
+        </Pressable>
+        <Pressable onPress={() => setSettingsVisible(true)} style={({ pressed }) => [styles.dockItem, styles.dockIconTile, { backgroundColor: isLight ? '#e5ebff' : '#26354d' }, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Settings">
+          <Text style={[styles.dockGlyph, styles.settingsDockGlyph, { color: isLight ? '#328052' : '#9bd5b2', fontSize: 22 }]}>⚙</Text>{!url && settings.showDockLabels !== false && <Text style={[styles.dockLabel, { color: palette.muted }]}>Settings</Text>}
+        </Pressable>
+      </View> : <Pressable onPress={() => setSettingsVisible(true)} style={styles.hiddenSettingsButton} accessibilityRole="button" accessibilityLabel="Open Settings"><Text style={styles.dockGlyph}>⚙</Text></Pressable>}
+
+      <Modal visible={bookmarksVisible} animationType="slide" transparent onRequestClose={() => setBookmarksVisible(false)}>
+        <View style={[styles.modalBackdrop, { backgroundColor: isLight ? 'rgba(25,35,55,0.28)' : 'rgba(3,8,17,0.7)' }]}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setBookmarksVisible(false)} accessibilityLabel="Close saved pages" />
+          <View style={[styles.sheet, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHeader}>
+              <View>
+                <Text style={[styles.sheetTitle, { color: palette.text }]}>Saved pages</Text>
+                <Text style={[styles.sheetSubtitle, { color: palette.muted }]}>Keep your favorite places close.</Text>
+              </View>
+              <IconButton label="Close saved pages" glyph="×" onPress={() => setBookmarksVisible(false)} secondary />
+            </View>
+            <Pressable onPress={() => openBookmarkEditor()} style={({ pressed }) => [styles.addBookmarkButton, pressed && styles.pressed]}>
+              <Text style={styles.addBookmarkGlyph}>＋</Text>
+              <Text style={styles.addBookmarkText}>Add a saved page</Text>
+            </Pressable>
+            <ScrollView style={styles.listScroll} keyboardShouldPersistTaps="handled">
+              {bookmarks.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyGlyph}>✦</Text>
+                  <Text style={styles.emptyTitle}>Nothing saved yet</Text>
+                  <Text style={styles.emptyText}>Save the page you’re on, or add a web address to get started.</Text>
+                </View>
+              ) : bookmarks.map((item, index) => (
+                <View key={item.id} style={styles.bookmarkRow}>
+                  <Pressable onPress={() => openSavedPage(item)} style={styles.bookmarkMain}>
+                    <Text style={styles.bookmarkMark}>↗</Text>
+                    <View style={styles.bookmarkCopy}>
+                      <Text numberOfLines={1} style={[styles.bookmarkTitle, { color: palette.text }]}>{item.name}</Text>
+                      <Text numberOfLines={1} style={[styles.bookmarkUrl, { color: palette.muted }]}>{item.url.replace(/^https?:\/\//, '')}</Text>
+                    </View>
+                  </Pressable>
+                  <View style={styles.bookmarkOrderActions}>
+                    <Pressable onPress={() => moveBookmark(index, -1)} style={styles.orderButton} accessibilityLabel={'Move ' + item.name + ' up'}>
+                      <Text style={styles.orderButtonText}>↑</Text>
+                    </Pressable>
+                    <Pressable onPress={() => moveBookmark(index, 1)} style={styles.orderButton} accessibilityLabel={'Move ' + item.name + ' down'}>
+                      <Text style={styles.orderButtonText}>↓</Text>
+                    </Pressable>
+                    <Pressable onPress={() => openBookmarkEditor(item)} style={styles.editButton} accessibilityRole="button" accessibilityLabel={'Edit ' + item.name}>
+                      <Text style={styles.editButtonText}>Edit</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+            <Text style={styles.sheetFootnote}>You can edit the title and address any time.</Text>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={editorVisible} animationType="slide" transparent onRequestClose={() => setEditorVisible(false)}>
+        <View style={styles.modalBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setEditorVisible(false)} accessibilityLabel="Close bookmark editor" />
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.sheetKeyboard}>
+            <View style={[styles.sheet, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+              <View style={styles.sheetHandle} />
+              <View style={styles.sheetHeader}>
+                <View>
+                  <Text style={[styles.sheetTitle, { color: palette.text }]}>{editingId ? 'Edit saved page' : 'Add saved page'}</Text>
+                  <Text style={[styles.sheetSubtitle, { color: palette.muted }]}>Give this place a name you’ll remember.</Text>
+                </View>
+                <IconButton label="Close editor" glyph="×" onPress={() => setEditorVisible(false)} secondary />
+              </View>
+              <Text style={styles.fieldLabel}>NAME</Text>
+              <TextInput value={bookmarkName} onChangeText={setBookmarkName} placeholder="My favorite site" placeholderTextColor="#7e8ba1" style={styles.fieldInput} />
+              <Text style={styles.fieldLabel}>WEB ADDRESS</Text>
+              <TextInput value={bookmarkUrl} onChangeText={setBookmarkUrl} autoCapitalize="none" autoCorrect={false} keyboardType="url" placeholder="https://example.com" placeholderTextColor="#7e8ba1" style={styles.fieldInput} />
+              <Pressable onPress={saveBookmark} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
+                <Text style={styles.primaryButtonText}>{editingId ? 'Save changes' : 'Save page'}</Text>
+              </Pressable>
+              {editingId && (
+                <Pressable onPress={() => deleteBookmark({ id: editingId, name: bookmarkName })} style={styles.removeButton}>
+                  <Text style={styles.removeButtonText}>Remove saved page</Text>
+                </Pressable>
+              )}
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
+      <Modal visible={setupVisible} animationType="fade" transparent onRequestClose={() => finishSetup(false)}>
+        <View style={styles.setupBackdrop}>
+          <View style={styles.setupCard}>
+            <Text style={styles.setupSpark}>✳</Text>
+            <Text style={styles.setupTitle}>Meet Veyra</Text>
+            <Text style={styles.setupBody}>Let’s set up your browser just the way you like it. Start with privacy-minded defaults, then choose which shortcuts appear on your home screen.</Text>
+            <Pressable style={styles.setupPrimary} onPress={() => finishSetup(false)}><Text style={styles.setupPrimaryText}>✓  Use defaults</Text></Pressable>
+            <Pressable style={styles.setupSecondary} onPress={() => finishSetup(true)}><Text style={styles.setupSecondaryText}>→  Configure</Text></Pressable>
+            <Text style={styles.setupFootnote}>You can change your choices any time in Settings.</Text>
+          </View>
+        </View>
+      </Modal>
+      <Modal visible={settingsVisible} animationType="slide" transparent={false} presentationStyle="fullScreen" onRequestClose={() => setSettingsVisible(false)}>
+        <SafeAreaView style={[styles.settingsPage, { backgroundColor: palette.bg }]}>
+          <View style={[styles.settingsPageHeader, { borderBottomColor: palette.border }]}>
+            <Pressable onPress={() => { if (settingsCategory) setSettingsCategory(null); else setSettingsVisible(false); }} style={({ pressed }) => [styles.settingsBackButton, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Back to Veyra">
+              <Text style={styles.settingsBackGlyph}>‹</Text>
+            </Pressable>
+            <View style={styles.settingsPageHeading}>
+              <Text style={[styles.settingsPageTitle, { color: palette.text }]}>{settingsCategory || 'Settings'}</Text>
+              <Text style={[styles.settingsPageSubtitle, { color: palette.muted }]}>{settingsCategory ? 'Customize this part of Veyra' : 'Make Veyra work your way'}</Text>
+            </View>
+            <Image source={require('./assets/icon.png')} style={styles.settingsPageIcon} />
+          </View>
+          <ScrollView style={styles.settingsScroll} contentContainerStyle={styles.settingsPageContent} keyboardShouldPersistTaps="handled">
+            {!settingsCategory ? (
+              <View style={styles.settingsCategoryList}>
+                {[
+                  { title: 'Customization', detail: 'Themes, home screen, dock, layout and Bible display', icon: '✦' },
+                  { title: 'Search', detail: 'Choose your search engine and search behavior', icon: '⌕' },
+                  { title: 'Extensions & tools', detail: 'Choose web tools and extension directories', icon: '⌘' },
+                  { title: 'Security & privacy', detail: 'Tracking protection, cookies and secure browsing', icon: '◈' },
+                  { title: 'Browsing data', detail: 'Clear browser history and cached data', icon: '⌫' },
+                ].map((item) => (
+                  <Pressable key={item.title} onPress={() => setSettingsCategory(item.title)} style={({ pressed }) => [styles.settingsCategoryCard, { backgroundColor: palette.surface, borderColor: palette.border }, pressed && styles.pressed]}>
+                    <View style={styles.settingsCategoryIcon}><Text style={styles.settingsCategoryGlyph}>{item.icon}</Text></View>
+                    <View style={styles.settingsCategoryCopy}><Text style={styles.settingsCategoryTitle}>{item.title}</Text><Text style={styles.settingsCategoryDetail}>{item.detail}</Text></View>
+                    <Text style={styles.settingsCategoryChevron}>›</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : (
+              <>
+                {settingsCategory === 'Customization' && (<>
+              <Text style={[styles.settingsSectionTitle, { color: palette.accent }]}>Color theme</Text>
+              <Text style={[styles.settingsIntro, { color: palette.muted }]}>Choose separate colors for Veyra’s dark and light appearance.</Text>
+              <View style={styles.themeChoices}>
+                <Pressable onPress={() => updateSetting('theme', 'dark')} style={[styles.themeChoice, { backgroundColor: settings.theme !== 'light' ? '#172238' : palette.surface, borderColor: settings.theme !== 'light' ? '#e8b76d' : palette.border }]}>
+                  <Text style={[styles.themeChoiceGlyph, { color: '#e8b76d' }]}>☾</Text><Text style={[styles.themeChoiceText, { color: settings.theme !== 'light' ? '#ffffff' : palette.text }]}>Dark</Text>
+                  {settings.theme !== 'light' && <Text style={styles.themeChoiceCheck}>✓</Text>}
+                </Pressable>
+                <Pressable onPress={() => updateSetting('theme', 'light')} style={[styles.themeChoice, { backgroundColor: settings.theme === 'light' ? '#e5ebff' : palette.surface, borderColor: settings.theme === 'light' ? '#4169d8' : palette.border }]}>
+                  <Text style={[styles.themeChoiceGlyph, { color: '#4169d8' }]}>☀</Text><Text style={[styles.themeChoiceText, { color: settings.theme === 'light' ? '#172033' : palette.text }]}>Light</Text>
+                  {settings.theme === 'light' && <Text style={[styles.themeChoiceCheck, { color: '#4169d8' }]}>✓</Text>}
+                </Pressable>
+              </View>
+              <Text style={[styles.settingsSectionTitle, { color: palette.accent }]}>Interface controls</Text>
+              <Text style={[styles.settingsIntro, { color: palette.muted }]}>Choose exactly what stays on screen. Hide Everything keeps a small Settings button available so you can restore your layout.</Text>
+              <View style={styles.backgroundActions}>
+                <Pressable onPress={() => setInterfacePreset(true)} style={styles.backgroundAction}><Text style={styles.backgroundActionText}>Show Everything</Text></Pressable>
+                <Pressable onPress={() => setInterfacePreset(false)} style={styles.backgroundAction}><Text style={styles.backgroundActionText}>Hide Everything</Text></Pressable>
+              </View>
+              <View style={[styles.settingsCard, { backgroundColor: palette.surfaceAlt, borderColor: palette.border }]}>
+                <SettingRow title="Browser header and logo" detail="Show or hide the Veyra branding at the top." value={settings.showHeader !== false} light={isLight} onValueChange={(value) => updateSetting('showHeader', value)} />
+                <View style={styles.settingDivider} />
+                <SettingRow title="Top search bar" detail="Show or hide the search field above the page." value={settings.showSearchBar !== false} light={isLight} onValueChange={(value) => updateSetting('showSearchBar', value)} />
+                <View style={styles.settingDivider} />
+                <SettingRow title="Navigation buttons" detail="Show or hide the back, forward, and home row." value={settings.showNavigationRow !== false} light={isLight} onValueChange={(value) => updateSetting('showNavigationRow', value)} />
+                <View style={styles.settingDivider} />
+                <SettingRow title="Bottom dock" detail="Hide the dock; a small Settings button remains so you can restore it." value={settings.showDock !== false} light={isLight} onValueChange={(value) => updateSetting('showDock', value)} />
+                <View style={styles.settingDivider} />
+                <SettingRow title="Welcome section" detail="Show or hide the home-page welcome heading." value={settings.showWelcome !== false} light={isLight} onValueChange={(value) => updateSetting('showWelcome', value)} />
+                <View style={styles.settingDivider} />
+                <SettingRow title="Saved pages section" detail="Show or hide bookmarks on the start page." value={settings.showBookmarksSection !== false} light={isLight} onValueChange={(value) => updateSetting('showBookmarksSection', value)} />
+                <View style={styles.settingDivider} />
+                <SettingRow title="Search provider footer" detail="Show or hide the search engine note at the bottom." value={settings.showSearchFooter !== false} light={isLight} onValueChange={(value) => updateSetting('showSearchFooter', value)} />
+              </View>
+
+              <Text style={[styles.settingsSectionTitle, { color: palette.accent }]}>Home screen</Text>
+              <Text style={[styles.settingsIntro, { color: palette.muted }]}>Choose what appears when Veyra opens.</Text>
+              <View style={[styles.settingsCard, { backgroundColor: palette.surfaceAlt, borderColor: palette.border }]}>
+                <SettingRow
+                  title="Daily Bible verse"
+                  detail="Show or hide the verse on your Veyra home screen."
+                  value={settings.showDailyVerse}
+                  light={isLight} onValueChange={(value) => updateSetting('showDailyVerse', value)}
+                />
+              </View>
+
+              <Text style={[styles.settingsSectionTitle, { color: palette.accent }]}>Appearance & layout</Text>
+              <Text style={[styles.settingsIntro, { color: palette.muted }]}>Tune the start page and bottom dock. Your choices are saved on this device.</Text>
+              <View style={[styles.settingsCard, { backgroundColor: palette.surfaceAlt, borderColor: palette.border }]}>
+                <SettingRow title="Compact start page" detail="Use a tighter home-screen layout with a smaller welcome heading." value={!!settings.compactHome} light={isLight} onValueChange={(value) => updateSetting('compactHome', value)} />
+                <View style={styles.settingDivider} />
+                <SettingRow title="Show browser tagline" detail="Show or hide the text beneath the Veyra name." value={settings.showBrandTagline !== false} light={isLight} onValueChange={(value) => updateSetting('showBrandTagline', value)} />
+                <View style={styles.settingDivider} />
+                <SettingRow title="Show privacy card" detail="Show or hide the privacy summary on the start page." value={settings.showPrivacySnapshot !== false} light={isLight} onValueChange={(value) => updateSetting('showPrivacySnapshot', value)} />
+                <View style={styles.settingDivider} />
+                <SettingRow title="Dock labels" detail="Show or hide Home, Saved, and Settings labels under dock icons." value={settings.showDockLabels !== false} light={isLight} onValueChange={(value) => updateSetting('showDockLabels', value)} />
+              </View>
+              <Text style={[styles.settingsSectionTitle, { color: palette.accent }]}>Quick paths</Text>
+              <Text style={[styles.settingsIntro, { color: palette.muted }]}>Turn each shortcut on or off. All are hidden by default.</Text>
+              <View style={[styles.settingsCard, { backgroundColor: palette.surfaceAlt, borderColor: palette.border }]}>
+                {QUICK_LINKS.map((item, index) => (
+                  <React.Fragment key={item.title}>
+                    {index > 0 && <View style={styles.settingDivider} />}
+                    <SettingRow
+                      title={item.title}
+                      detail={'Show ' + item.title + ' on the Veyra home screen.'}
+                      value={!!(settings.quickPaths && settings.quickPaths[item.title])}
+                      light={isLight} onValueChange={(value) => updateSetting('quickPaths', { ...(settings.quickPaths || DEFAULT_SETTINGS.quickPaths), [item.title]: value })}
+                    />
+                  </React.Fragment>
+                ))}
+              </View>
+
+              <Text style={[styles.settingsSectionTitle, { color: palette.accent }]}>Home background</Text>
+              <Text style={[styles.settingsIntro, { color: palette.muted }]}>Choose a photo from your library for Veyra’s home screen.</Text>
+              <View style={styles.backgroundActions}>
+                <Pressable onPress={chooseBackground} style={({ pressed }) => [styles.backgroundAction, pressed && styles.pressed]}>
+                  <Text style={styles.backgroundActionText}>Choose photo</Text>
+                </Pressable>
+                <Pressable onPress={() => saveBackground(null)} style={({ pressed }) => [styles.backgroundAction, pressed && styles.pressed]}>
+                  <Text style={styles.backgroundActionText}>Reset</Text>
+                </Pressable>
+              </View>
+
+              <Text style={[styles.settingsSectionTitle, { color: palette.accent }]}>Bible translation</Text>
+              <Text style={[styles.settingsIntro, { color: palette.muted }]}>The verse on your Veyra home screen changes to the translation you pick. These are public-domain texts that load from bible-api.com. KJV and WEB also work offline.</Text>
+              <View style={styles.transWrap}>
+                {[...TRANSLATIONS, ...apiBibles].map((item) => (
+                  <Pressable
+                    key={item.id}
+                    onPress={() => updateSetting('verseTranslation', item.id)}
+                    style={[styles.transOption, settings.verseTranslation === item.id && styles.engineOptionSelected]}
+                  >
+                    <Text style={[styles.engineOptionText, settings.verseTranslation === item.id && styles.engineOptionTextSelected]}>{item.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Text style={[styles.settingsIntro, { color: palette.muted }]}>Licensed versions such as NIV, NASB and ESV can’t be bundled in an app. If you have a free API.Bible key, paste it here to load the versions your key is licensed for.</Text>
+              <TextInput
+                value={settings.bibleKey}
+                onChangeText={(value) => updateSetting('bibleKey', value.trim())}
+                placeholder="API.Bible key (optional)"
+                placeholderTextColor="#7e8ba1"
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={styles.fieldInput}
+              />
+              <View style={[styles.backgroundActions, { marginTop: 10 }]}>
+                <Pressable onPress={loadApiBibles} style={({ pressed }) => [styles.backgroundAction, pressed && styles.pressed]}>
+                  <Text style={styles.backgroundActionText}>Load my versions</Text>
+                </Pressable>
+                <Pressable onPress={clearApiBibles} style={({ pressed }) => [styles.backgroundAction, pressed && styles.pressed]}>
+                  <Text style={styles.backgroundActionText}>Remove versions</Text>
+                </Pressable>
+              </View>
+
+                </>)}
+                {settingsCategory === 'Search' && <>
+              <Text style={[styles.settingsSectionTitle, { color: palette.accent }]}>Search</Text>
+              <Text style={[styles.settingsIntro, { color: palette.muted }]}>Choose where Veyra sends search terms. Bang shortcuts like !w and !yt use DuckDuckGo.</Text>
+              <View style={styles.engineOptions}>
+                {Object.keys(SEARCH_ENGINES).map((engine) => (
+                  <Pressable
+                    key={engine}
+                    onPress={() => updateSetting('searchEngine', engine)}
+                    style={[styles.engineOption, settings.searchEngine === engine && styles.engineOptionSelected]}
+                  >
+                    <Text style={[styles.engineOptionText, settings.searchEngine === engine && styles.engineOptionTextSelected]}>{engine}</Text>
+                    {settings.searchEngine === engine && <Text style={styles.engineCheck}>✓</Text>}
+                  </Pressable>
+                ))}
+              </View>
+
+                </>}
+                {settingsCategory === 'Extensions & tools' && <>
+              <Text style={[styles.settingsSectionTitle, { color: palette.accent }]}>Extensions & tools</Text>
+              <Text style={[styles.settingsIntro, { color: palette.muted }]}>Chrome Web Store extensions cannot be installed on iPhone. These are compatible web tools that open as websites, not installable browser extensions.</Text>
+              <View style={[styles.settingsCard, { backgroundColor: palette.surfaceAlt, borderColor: palette.border }]}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Choose extension or web tool"
+                  onPress={() => setExtensionMenuOpen((open) => !open)}
+                  style={({ pressed }) => [styles.selectMenuButton, pressed && styles.pressed]}
+                >
+                  <View style={styles.settingCopy}>
+                    <Text style={styles.settingTitle}>{settings.extensionShortcut || 'Google Translate'}</Text>
+                    <Text style={styles.settingDetail}>Select a tool to open</Text>
+                  </View>
+                  <Text style={styles.selectMenuChevron}>{extensionMenuOpen ? '⌃' : '⌄'}</Text>
+                </Pressable>
+                {extensionMenuOpen && Object.keys(EXTENSION_TOOLS).map((tool) => (
+                  <Pressable
+                    key={tool}
+                    onPress={() => { updateSetting('extensionShortcut', tool); setExtensionMenuOpen(false); }}
+                    style={({ pressed }) => [styles.selectMenuOption, settings.extensionShortcut === tool && styles.selectMenuOptionSelected, pressed && styles.pressed]}
+                  >
+                    <Text style={[styles.settingTitle, settings.extensionShortcut === tool && styles.selectMenuOptionTextSelected]}>{tool}</Text>
+                    {settings.extensionShortcut === tool && <Text style={styles.engineCheck}>✓</Text>}
+                  </Pressable>
+                ))}
+                <View style={styles.settingDivider} />
+                <Pressable
+                  onPress={() => Linking.openURL(EXTENSION_TOOLS[settings.extensionShortcut] || EXTENSION_TOOLS['Google Translate']).catch(() => Alert.alert('Could not open tool', 'Check your connection and try again.'))}
+                  style={({ pressed }) => [styles.settingsActionButton, pressed && styles.pressed]}
+                >
+                  <Text style={styles.settingsActionButtonText}>Open {settings.extensionShortcut || 'Chrome Web Store'} ↗</Text>
+                </Pressable>
+              </View>
+
+                </>}
+                {settingsCategory === 'Security & privacy' && <>
+              <Text style={[styles.settingsSectionTitle, { color: palette.accent }]}>Passwords</Text>
+              <Text style={[styles.settingsIntro, { color: palette.muted }]}>Open your password manager inside Veyra. Some providers may require Safari for secure sign-in; Veyra never stores your vault passwords.</Text>
+              <View style={[styles.settingsCard, { backgroundColor: palette.surfaceAlt, borderColor: palette.border }]}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Choose password manager"
+                  onPress={() => setPasswordMenuOpen((open) => !open)}
+                  style={({ pressed }) => [styles.selectMenuButton, pressed && styles.pressed]}
+                >
+                  <View style={styles.settingCopy}>
+                    <Text style={styles.settingTitle}>{settings.passwordManager || 'Bitwarden'}</Text>
+                    <Text style={styles.settingDetail}>Selected password manager</Text>
+                  </View>
+                  <Text style={styles.selectMenuChevron}>{passwordMenuOpen ? '⌃' : '⌄'}</Text>
+                </Pressable>
+                {passwordMenuOpen && Object.keys(PASSWORD_MANAGERS).map((manager) => (
+                  <Pressable
+                    key={manager}
+                    onPress={() => { updateSetting('passwordManager', manager); setPasswordMenuOpen(false); }}
+                    style={({ pressed }) => [styles.selectMenuOption, settings.passwordManager === manager && styles.selectMenuOptionSelected, pressed && styles.pressed]}
+                  >
+                    <Text style={[styles.settingTitle, settings.passwordManager === manager && styles.selectMenuOptionTextSelected]}>{manager}</Text>
+                    {settings.passwordManager === manager && <Text style={styles.engineCheck}>✓</Text>}
+                  </Pressable>
+                ))}
+                <View style={styles.settingDivider} />
+                <Pressable
+                  onPress={() => { const managerUrl = PASSWORD_MANAGERS[settings.passwordManager] || PASSWORD_MANAGERS.Bitwarden; setSettingsVisible(false); navigate(managerUrl); }}
+                  style={({ pressed }) => [styles.settingsActionButton, pressed && styles.pressed]}
+                >
+                  <Text style={styles.settingsActionButtonText}>Open {settings.passwordManager || 'Bitwarden'} ↗</Text>
+                </Pressable>
+              </View>
+
+                </>}
+                {settingsCategory === 'Security & privacy' && <>
+              <Text style={[styles.settingsSectionTitle, { color: palette.accent }]}>Security &amp; privacy</Text>
+              <Text style={[styles.settingsIntro, { color: palette.muted }]}>Password managers and browser protections are kept together here. Veyra does not save or read your password vault.</Text>
+              <View style={[styles.settingsCard, { backgroundColor: palette.surfaceAlt, borderColor: palette.border }]}>
+                <SettingRow title="Enhanced ad & tracker blocking" detail="Uses an expanded list of ad and tracking domains, hides common ad containers, and blocks many script-based tracking requests. Some ads may still appear because iOS WebView does not expose every network request." value={settings.blockAds} light={isLight} onValueChange={(value) => updateSetting('blockAds', value)} />
+                <View style={styles.settingDivider} />
+                <SettingRow title="Prefer secure connections" detail="Upgrade http links to https, including links you tap, and block insecure mixed content." value={settings.preferHttps} light={isLight} onValueChange={(value) => updateSetting('preferHttps', value)} />
+                <View style={styles.settingDivider} />
+                <SettingRow title="JavaScript" detail="Many sites need this to work. Turn it off for a stricter, simpler session." value={settings.javaScriptEnabled} light={isLight} onValueChange={(value) => updateSetting('javaScriptEnabled', value)} />
+                <View style={styles.settingDivider} />
+                <SettingRow title="Allow pop-up windows" detail="Keep pop-ups blocked unless a site you trust needs them." value={settings.allowPopups} light={isLight} onValueChange={(value) => updateSetting('allowPopups', value)} />
+                <View style={styles.settingDivider} />
+                <SettingRow title="Private browsing" detail="Use an isolated, non-persistent website session where the platform supports it." value={settings.privateBrowsing} light={isLight} onValueChange={(value) => updateSetting('privateBrowsing', value)} />
+                <View style={styles.settingDivider} />
+                <SettingRow title="Block third-party cookies" detail="Prevent embedded third-party sites from setting cookies in the browser view." value={settings.blockThirdPartyCookies} light={isLight} onValueChange={(value) => updateSetting('blockThirdPartyCookies', value)} />
+                <View style={styles.settingDivider} />
+                <SettingRow title="Website storage" detail="Allow sites to remember preferences and keep you signed in. Some sites need this enabled." value={settings.domStorageEnabled} light={isLight} onValueChange={(value) => updateSetting('domStorageEnabled', value)} />
+              </View>
+
+              <View style={styles.privacyNote}>
+                <Text style={styles.privacyNoteMark}>✦</Text>
+                <View style={styles.privacyNoteCopy}>
+                  <Text style={styles.privacyNoteTitle}>Built for a little more privacy</Text>
+                  <Text style={styles.privacyNoteBody}>
+                    {Platform.OS === 'android'
+                      ? 'Veyra blocks local-file access. Android can restrict third-party cookies; iOS WebView does not provide an equivalent reliable all-cookie switch. Search stays with your selected provider.'
+                      : 'Veyra blocks local-file access. iOS WebView does not provide a reliable switch to block every cookie; private-session behavior can vary by iOS version. Search stays with your selected provider.'}
+                  </Text>
+                </View>
+              </View>
+
+                </>}
+                {settingsCategory === 'Browsing data' && <>
+              <Text style={[styles.settingsSectionTitle, { color: palette.accent }]}>Browsing data</Text>
+              <Text style={[styles.settingsIntro, { color: palette.muted }]}>
+                {Platform.OS === 'android'
+                  ? 'Clear cached site files and the current browser history. Saved pages are kept.'
+                  : 'Close the current page and clear its history. Saved pages are kept.'}
+              </Text>
+              <Pressable onPress={clearBrowserData} style={({ pressed }) => [styles.clearDataButton, pressed && styles.pressed]}>
+                <Text style={styles.clearDataGlyph}>⌫</Text>
+                <Text style={styles.clearDataText}>{Platform.OS === 'android' ? 'Clear cache and history' : 'Clear history'}</Text>
+              </Pressable>
+                </>}
+              </>
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+      </SafeAreaView>
+      </ImageBackground>
   );
 }
 
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#10101a" }, content: { flex: 1, backgroundColor: "#10101a" },
-  topBrand: { paddingHorizontal: 22, paddingTop: 12, paddingBottom: 8, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  brand: { color: "#f7f5ff", fontSize: 27, fontWeight: "800", letterSpacing: 1 }, brandCaption: { color: "#9385ef", fontSize: 8, letterSpacing: 4, marginTop: -2 },
-  topAction: { width: 42, height: 42, borderRadius: 15, backgroundColor: "#201e31", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#39344f" },
-  home: { flexGrow: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24, paddingBottom: 28 },
-  heroMark: { width: 78, height: 78, borderRadius: 25, backgroundColor: "#292443", borderWidth: 1, borderColor: "#51477d", alignItems: "center", justifyContent: "center", marginBottom: 24 },
-  heroV: { color: "#a9a0ff", fontSize: 51, fontWeight: "800", marginTop: -4 },
-  welcome: { color: "#f7f5ff", fontSize: 30, fontWeight: "800", textAlign: "center" }, subtitle: { color: "#aaa5c2", fontSize: 15, marginTop: 10, textAlign: "center" },
-  quickActions: { flexDirection: "row", gap: 12, marginTop: 36, width: "100%" }, quickCard: { flex: 1, minHeight: 112, borderRadius: 18, padding: 16, backgroundColor: "#1b192b", borderWidth: 1, borderColor: "#39344f" },
-  quickTitle: { color: "#f4f1ff", fontWeight: "700", marginTop: 12 }, quickSub: { color: "#8f8aa8", fontSize: 12, marginTop: 4 },
-  dock: { paddingHorizontal: 13, paddingTop: 12, paddingBottom: 9, backgroundColor: "#171525", borderTopWidth: 1, borderColor: "#302c45", gap: 9 },
-  dockCompact: { paddingTop: 7, paddingBottom: 5, gap: 5 }, addressBar: { height: 48, flexDirection: "row", alignItems: "center", backgroundColor: "#242238", borderRadius: 16, borderWidth: 1, borderColor: "#494365", paddingHorizontal: 7 },
-  addressIcon: { paddingHorizontal: 7 }, input: { flex: 1, color: "#fff", paddingHorizontal: 5, fontSize: 14 }, go: { backgroundColor: PURPLE, paddingHorizontal: 16, paddingVertical: 9, borderRadius: 12 }, goText: { color: "white", fontWeight: "700" },
-  dockActions: { flexDirection: "row", justifyContent: "space-around", alignItems: "center", height: 43 }, dockButton: { width: 48, height: 40, alignItems: "center", justifyContent: "center" },
-  web: { flex: 1, backgroundColor: "white" }, panelBody: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 },
-  panelHeading: { marginBottom: 20 }, backText: { color: "#a99dfb", fontSize: 14, marginBottom: 14 }, panelTitle: { color: "#f7f5ff", fontSize: 28, fontWeight: "800" },
-  menuRow: { flexDirection: "row", alignItems: "center", paddingVertical: 17, borderBottomWidth: 1, borderBottomColor: "#2b283d", gap: 13 },
-  menuIcon: { width: 40, height: 40, borderRadius: 13, backgroundColor: "#282442", alignItems: "center", justifyContent: "center" }, menuTitle: { color: "#f0edff", fontSize: 15, fontWeight: "600" },
-  menuSub: { color: "#8f8aa8", fontSize: 12, marginTop: 4, lineHeight: 17 }, chevron: { color: "#77718e", fontSize: 26, paddingHorizontal: 5 },
-  settingRow: { flexDirection: "row", alignItems: "center", paddingVertical: 17, borderBottomWidth: 1, borderBottomColor: "#2b283d" },
-  infoCard: { backgroundColor: "#1b192b", borderRadius: 16, borderWidth: 1, borderColor: "#39344f", padding: 18, marginTop: 8 },
-  empty: { color: "#8f8aa8", textAlign: "center", marginTop: 48 }, savedRow: { flexDirection: "row", alignItems: "center", paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: "#2b283d" }
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#0b1220' },
+  themeChoices: { flexDirection: 'row', gap: 10, marginBottom: 16 },
+  themeChoice: { flex: 1, minHeight: 72, borderRadius: 15, borderWidth: 1.5, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 9 },
+  themeChoiceGlyph: { fontSize: 23, fontWeight: '700' },
+  themeChoiceText: { fontSize: 14, fontWeight: '800' },
+  themeChoiceCheck: { marginLeft: 'auto', color: '#e8b76d', fontWeight: '900', fontSize: 16 },
+  dockIconTile: { minWidth: 46, minHeight: 46, borderRadius: 16, paddingHorizontal: 7, paddingVertical: 5, borderWidth: 1, shadowOffset: { width: 0, height: 2 }, shadowRadius: 7, elevation: 2 },
+
+  settingsDockGlyph: { fontSize: 21, lineHeight: 24 },
+
+  backgroundImageStyle: { opacity: 0.28 },
+  safeRoot: { flex: 1, backgroundColor: 'transparent' },
+  header: { paddingHorizontal: 18, paddingTop: 10, paddingBottom: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 },
+  brandIcon: { width: 42, height: 42, borderRadius: 12 },
+  brandName: { color: '#f7f4ee', fontSize: 21, fontWeight: '800', letterSpacing: 0.2 },
+  brandTagline: { color: '#8995aa', fontSize: 12, marginTop: 1 },
+  headerActions: { flexDirection: 'row', gap: 4 },
+  headerAction: { alignItems: 'center', justifyContent: 'center', minWidth: 48, paddingHorizontal: 5, paddingVertical: 4 },
+  headerActionGlyph: { color: '#e6b366', fontSize: 19, height: 22 },
+  headerActionText: { color: '#bac4d5', fontSize: 11, fontWeight: '600' },
+  searchRow: { flexDirection: 'row', marginHorizontal: 38, backgroundColor: '#172238', borderColor: '#293752', borderWidth: 1, borderRadius: 18, padding: 2, gap: 3, alignItems: 'center', minHeight: 38, maxHeight: 40 },
+  addressInput: { flex: 1, minWidth: 0, paddingHorizontal: 9, paddingVertical: 4, color: '#f3f5f8', fontSize: 13 },
+  searchButton: { backgroundColor: '#e6ad60', borderRadius: 15, paddingHorizontal: 11, paddingVertical: 5, minWidth: 42, alignItems: 'center' },
+  searchButtonText: { color: '#192235', fontWeight: '800', fontSize: 13 },
+  navRow: { minHeight: 46, paddingHorizontal: 18, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  hiddenSettingsButton: { position: 'absolute', right: 12, bottom: 12, width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: '#172238', borderWidth: 1, borderColor: '#e6ad60' },
+  bottomDock: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', marginHorizontal: 22, marginTop: 5, marginBottom: Platform.OS === 'ios' ? 8 : 10, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 23, backgroundColor: 'rgba(23, 34, 56, 0.97)', borderWidth: 1, borderColor: '#35435c', shadowColor: '#000', shadowOpacity: 0.22, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
+  bottomDockBrowsing: { marginHorizontal: 12, paddingHorizontal: 7, gap: 5 },
+  bottomDockHome: { marginHorizontal: 14, marginTop: 10, marginBottom: Platform.OS === 'ios' ? 12 : 14, paddingHorizontal: 12, paddingVertical: 12, minHeight: 76, gap: 8, borderRadius: 26 },
+  homeDockSearch: { flex: 1, minWidth: 0, height: 48, borderRadius: 18, paddingLeft: 12, paddingRight: 5 },
+  safariAddressBar: { flex: 1, minWidth: 0, height: 42, flexDirection: 'row', alignItems: 'center', backgroundColor: '#0d1728', borderWidth: 1, borderColor: '#3b4961', borderRadius: 15, paddingLeft: 10, paddingRight: 4, gap: 5 },
+  safariLock: { color: '#8bd1b1', fontSize: 17 },
+  safariAddressInput: { flex: 1, minWidth: 0, paddingVertical: 4, color: '#f3f5f8', fontSize: 13 },
+  safariReload: { width: 32, height: 32, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  safariReloadGlyph: { color: '#e6b366', fontSize: 23, lineHeight: 26 },
+  dockItem: { minWidth: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8, paddingVertical: 3, gap: 2 },
+  dockGlyph: { color: '#e6b366', fontSize: 20, lineHeight: 23 },
+  dockLabel: { color: '#bac4d5', fontSize: 10, fontWeight: '700' },
+  iconButton: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#e4ac5e', alignItems: 'center', justifyContent: 'center' },
+  iconButtonSecondary: { backgroundColor: '#172238', borderWidth: 1, borderColor: '#293752' },
+  iconGlyph: { color: '#172238', fontSize: 25, lineHeight: 29, fontWeight: '500' },
+  iconGlyphSecondary: { color: '#e4ac5e' },
+  saveCurrentButton: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#394862', borderRadius: 13, paddingHorizontal: 12, paddingVertical: 9, gap: 5 },
+  saveCurrentGlyph: { color: '#e4ac5e', fontSize: 18, lineHeight: 20 },
+  saveCurrentText: { color: '#dbe2ed', fontSize: 13, fontWeight: '700' },
+  searchHint: { flex: 1, alignItems: 'flex-end', paddingRight: 1 },
+  searchHintText: { color: '#8190a8', fontSize: 12 },
+  progress: { height: 3 },
+  homeScroll: { flex: 1 },
+  homeContent: { paddingHorizontal: 18, paddingBottom: 30 },
+  homeContentCompact: { paddingHorizontal: 13, paddingBottom: 18 },
+  welcomeTitleCompact: { fontSize: 25, lineHeight: 30 },
+  welcomeBlock: { paddingTop: 14, paddingBottom: 16 },
+  eyebrow: { color: '#e7b366', fontSize: 11, fontWeight: '800', letterSpacing: 1.6, marginBottom: 9 },
+  welcomeTitle: { color: '#f7f4ee', fontSize: 31, fontWeight: '700', letterSpacing: -0.7, lineHeight: 37 },
+  welcomeBody: { color: '#9aa7bb', fontSize: 14, marginTop: 8 },
+  verseCard: { backgroundColor: '#172238', borderColor: '#293752', borderWidth: 1, borderRadius: 20, padding: 13, marginTop: 2 },
+  verseTopline: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 2, paddingBottom: 9 },
+  verseLabelWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  verseSpark: { color: '#e8b76d', fontSize: 15 },
+  verseLabel: { color: '#f4e7cf', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+  verseReference: { color: '#e8b76d', fontSize: 11, fontWeight: '800', letterSpacing: 0.6 },
+  verseText: { color: '#f4f0e7', fontSize: 15, lineHeight: 22, paddingHorizontal: 5, paddingVertical: 8 },
+  verseSourceButton: { alignSelf: 'flex-start', marginTop: 5, paddingHorizontal: 5, paddingVertical: 6 },
+  verseSourceText: { color: '#e8b76d', fontSize: 13, fontWeight: '700' },
+  sectionHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 21, marginBottom: 10 },
+  sectionTitle: { color: '#f2f3f5', fontSize: 16, fontWeight: '700' },
+  sectionHint: { color: '#8190a8', fontSize: 12 },
+  seeAll: { color: '#e8b76d', fontWeight: '700', fontSize: 13 },
+  homeBookmarkActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  bookmarkEmptyHome: { borderWidth: 1, borderColor: '#293752', borderStyle: 'dashed', borderRadius: 14, padding: 14, marginBottom: 8 },
+  bookmarkEmptyText: { color: '#aab6c9', fontSize: 12, textAlign: 'center' },
+  quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
+  setupBackdrop: { flex: 1, backgroundColor: 'rgba(4, 8, 18, 0.82)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  setupCard: { width: '100%', maxWidth: 420, borderRadius: 28, paddingHorizontal: 24, paddingVertical: 30, alignItems: 'center', backgroundColor: '#243b88', borderWidth: 1, borderColor: '#536dc0' },
+  setupSpark: { color: '#f6f2e8', fontSize: 48, marginBottom: 12 },
+  setupTitle: { color: '#ffffff', fontSize: 30, fontWeight: '700', textAlign: 'center' },
+  setupBody: { color: '#d5def7', fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: 12, marginBottom: 24 },
+  setupPrimary: { width: '100%', borderRadius: 14, backgroundColor: '#657fd0', paddingVertical: 14, alignItems: 'center', marginBottom: 10 },
+  setupPrimaryText: { color: '#ffffff', fontSize: 15, fontWeight: '700' },
+  setupSecondary: { width: '100%', borderRadius: 14, backgroundColor: '#f7f7fa', paddingVertical: 14, alignItems: 'center' },
+  setupSecondaryText: { color: '#202a45', fontSize: 15, fontWeight: '700' },
+  setupFootnote: { color: '#c5d0f1', fontSize: 10, textAlign: 'center', marginTop: 22 },
+  quickCard: { width: '48%', minHeight: 72, flexDirection: 'row', alignItems: 'center', backgroundColor: '#121c2f', borderWidth: 1, borderColor: '#202d43', borderRadius: 15, paddingHorizontal: 10, paddingVertical: 9, gap: 8 },
+  quickMark: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  quickMarkText: { fontWeight: '800', fontSize: 16 },
+  quickCopy: { flex: 1, minWidth: 0 },
+  quickTitle: { color: '#e9edf4', fontSize: 13, fontWeight: '700' },
+  quickSubtitle: { color: '#7f8ca2', fontSize: 12, marginTop: 3 },
+  quickArrow: { color: '#75849d', fontSize: 19 },
+  savedHomeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 13, padding: 10, marginBottom: 7, backgroundColor: '#121c2f' },
+  savedHomeMark: { width: 30, height: 30, borderRadius: 10, textAlign: 'center', textAlignVertical: 'center', color: '#e8b76d', backgroundColor: '#26334b', overflow: 'hidden', fontSize: 16 },
+  savedHomeCopy: { flex: 1 },
+  savedHomeTitle: { color: '#e8edf5', fontSize: 13, fontWeight: '700' },
+  savedHomeUrl: { color: '#8090a6', fontSize: 12, marginTop: 2 },
+  privacySnapshot: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20, padding: 13, borderRadius: 16, backgroundColor: '#142b2e', borderWidth: 1, borderColor: '#244849' },
+  privacySnapshotIcon: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#20413f' },
+  privacySnapshotGlyph: { color: '#8bd1b1', fontSize: 18 },
+  privacySnapshotCopy: { flex: 1, minWidth: 0 },
+  privacySnapshotTitle: { color: '#d9f0e4', fontSize: 13, fontWeight: '800' },
+  privacySnapshotBody: { color: '#98b9aa', fontSize: 11, lineHeight: 16, marginTop: 3 },
+  privacySnapshotAction: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: '#254441' },
+  privacySnapshotActionText: { color: '#c6ead9', fontSize: 12, fontWeight: '800' },
+  footerNote: { color: '#64738a', fontSize: 11, letterSpacing: 1.1, textAlign: 'center', marginTop: 20 },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(3,8,17,0.7)', justifyContent: 'flex-end' },
+  sheetKeyboard: { width: '100%' },
+  sheet: { backgroundColor: '#111b2c', borderColor: '#28364d', borderWidth: 1, borderTopLeftRadius: 25, borderTopRightRadius: 25, paddingHorizontal: 20, paddingTop: 11, paddingBottom: 28, maxHeight: '88%' },
+  sheetHandle: { width: 40, height: 4, backgroundColor: '#43516a', borderRadius: 3, alignSelf: 'center', marginBottom: 15 },
+  sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 },
+  sheetTitle: { color: '#f5f4f0', fontSize: 21, fontWeight: '700' },
+  sheetSubtitle: { color: '#93a0b5', fontSize: 12, marginTop: 4 },
+  addBookmarkButton: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 13, backgroundColor: '#26354d', padding: 13, marginBottom: 10 },
+  addBookmarkGlyph: { color: '#e8b76d', fontSize: 20, lineHeight: 22 },
+  addBookmarkText: { color: '#f0e9dd', fontSize: 13, fontWeight: '700' },
+  listScroll: { flexGrow: 0, maxHeight: 380 },
+  bookmarkRow: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#263248', paddingVertical: 11 },
+  bookmarkMain: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  bookmarkMark: { width: 34, height: 34, borderRadius: 11, backgroundColor: '#202d43', color: '#e8b76d', textAlign: 'center', textAlignVertical: 'center', overflow: 'hidden', fontSize: 16 },
+  bookmarkCopy: { flex: 1, minWidth: 0 },
+  bookmarkTitle: { color: '#edf0f4', fontSize: 13, fontWeight: '700' },
+  bookmarkUrl: { color: '#8795aa', fontSize: 12, marginTop: 3 },
+  bookmarkOrderActions: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  orderButton: { minWidth: 28, minHeight: 34, alignItems: 'center', justifyContent: 'center' },
+  orderButtonText: { color: '#aab6c9', fontSize: 16, fontWeight: '700' },
+  editButton: { paddingVertical: 8, paddingHorizontal: 9 },
+  editButtonText: { color: '#e8b76d', fontWeight: '700', fontSize: 13 },
+  emptyState: { alignItems: 'center', paddingHorizontal: 22, paddingVertical: 34 },
+  emptyGlyph: { color: '#e8b76d', fontSize: 26, marginBottom: 7 },
+  emptyTitle: { color: '#edf0f4', fontSize: 15, fontWeight: '700' },
+  emptyText: { color: '#93a0b5', fontSize: 12, textAlign: 'center', lineHeight: 18, marginTop: 6 },
+  sheetFootnote: { color: '#708099', fontSize: 12, textAlign: 'center', marginTop: 11 },
+  fieldLabel: { color: '#9eabc0', fontSize: 11, letterSpacing: 1.1, fontWeight: '800', marginTop: 8, marginBottom: 7 },
+  fieldInput: { backgroundColor: '#172238', color: '#f2f4f7', borderColor: '#30405a', borderWidth: 1, borderRadius: 13, paddingHorizontal: 13, paddingVertical: 13, fontSize: 14 },
+  primaryButton: { marginTop: 18, backgroundColor: '#e6ad60', borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
+  primaryButtonText: { color: '#1a2435', fontSize: 14, fontWeight: '800' },
+  removeButton: { alignItems: 'center', paddingVertical: 14 },
+  removeButtonText: { color: '#e58c87', fontSize: 13, fontWeight: '700' },
+  settingsPage: { flex: 1, backgroundColor: '#0b1220' },
+  settingsCategoryList: { gap: 11 },
+  settingsCategoryCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#131e30', borderWidth: 1, borderColor: '#29374d', borderRadius: 17, padding: 15, gap: 13 },
+  settingsCategoryIcon: { width: 42, height: 42, borderRadius: 13, backgroundColor: '#202e43', alignItems: 'center', justifyContent: 'center' },
+  settingsCategoryGlyph: { color: '#e8b76d', fontSize: 22, fontWeight: '700' },
+  settingsCategoryCopy: { flex: 1, gap: 4 },
+  settingsCategoryTitle: { color: '#f2f5fa', fontSize: 15, fontWeight: '700' },
+  settingsCategoryDetail: { color: '#93a2b8', fontSize: 12, lineHeight: 17 },
+  settingsCategoryChevron: { color: '#8b9bb2', fontSize: 27, paddingLeft: 5 },
+  settingsPageHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingTop: 12, paddingBottom: 18, borderBottomWidth: 1, borderBottomColor: '#263248', gap: 12 },
+  settingsBackButton: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#172238', borderWidth: 1, borderColor: '#293752' },
+  settingsBackGlyph: { color: '#e8b76d', fontSize: 34, lineHeight: 38, marginTop: -3 },
+  settingsPageHeading: { flex: 1 },
+  settingsPageTitle: { color: '#f7f4ee', fontSize: 25, fontWeight: '800', letterSpacing: -0.4 },
+  settingsPageSubtitle: { color: '#8995aa', fontSize: 12, marginTop: 3 },
+  settingsPageIcon: { width: 40, height: 40, borderRadius: 12 },
+  settingsPageContent: { paddingHorizontal: 18, paddingTop: 16, paddingBottom: 34 },
+  settingsScroll: { flex: 1 },
+  settingsSectionTitle: { color: '#e8b76d', fontSize: 11, fontWeight: '800', letterSpacing: 1.2, marginTop: 7, marginBottom: 7 },
+  settingsIntro: { color: '#92a0b6', fontSize: 12, lineHeight: 18, marginBottom: 10 },
+  backgroundActions: { flexDirection: 'row', gap: 8, marginBottom: 17 },
+  backgroundAction: { flex: 1, minHeight: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#172238', borderColor: '#293752', borderWidth: 1 },
+  backgroundActionText: { color: '#e8edf4', fontSize: 13, fontWeight: '700' },
+  engineOptions: { flexDirection: 'row', gap: 7, marginBottom: 17 },
+  engineOption: { flex: 1, minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#172238', borderColor: '#293752', borderWidth: 1, paddingHorizontal: 4, gap: 4 },
+  engineOptionSelected: { borderColor: '#e6ad60', backgroundColor: '#392f28' },
+  engineOptionText: { color: '#9ba8bc', fontSize: 12, fontWeight: '700' },
+  engineOptionTextSelected: { color: '#ffe3b1' },
+  transWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 17 },
+  transOption: { minHeight: 38, justifyContent: 'center', borderRadius: 12, backgroundColor: '#172238', borderColor: '#293752', borderWidth: 1, paddingHorizontal: 12 },
+  verseNote: { color: '#8190a8', fontSize: 12, paddingHorizontal: 5, paddingBottom: 4 },
+  engineCheck: { color: '#e6ad60', fontSize: 12, fontWeight: '800' },
+  settingsCard: { backgroundColor: '#172238', borderColor: '#293752', borderWidth: 1, borderRadius: 16, paddingHorizontal: 13, marginBottom: 16 },
+  selectMenuButton: { flexDirection: 'row', alignItems: 'center', minHeight: 62, paddingVertical: 10, paddingHorizontal: 13, gap: 10 },
+  selectMenuChevron: { color: '#e8b76d', fontSize: 23, paddingHorizontal: 6 },
+  selectMenuOption: { minHeight: 48, paddingHorizontal: 15, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#293752' },
+  selectMenuOptionSelected: { backgroundColor: '#202d43' },
+  selectMenuOptionTextSelected: { color: '#e8b76d' },
+  settingsActionButton: { margin: 10, paddingHorizontal: 14, paddingVertical: 12, alignItems: 'center', borderRadius: 11, backgroundColor: '#e6ad60' },
+  settingsActionButtonText: { color: '#192235', fontSize: 13, fontWeight: '800' },
+  settingRow: { flexDirection: 'row', alignItems: 'center', minHeight: 72, paddingVertical: 10, gap: 10 },
+  settingCopy: { flex: 1 },
+  settingTitle: { color: '#e7ebf1', fontSize: 14, fontWeight: '700' },
+  settingDetail: { color: '#8694aa', fontSize: 12, lineHeight: 17, marginTop: 4 },
+  settingDivider: { height: 1, backgroundColor: '#2b3850' },
+  privacyNote: { flexDirection: 'row', gap: 11, backgroundColor: '#142b2e', borderColor: '#244849', borderWidth: 1, borderRadius: 15, padding: 13, marginBottom: 17 },
+  privacyNoteMark: { color: '#80c4a5', fontSize: 18 },
+  privacyNoteCopy: { flex: 1 },
+  privacyNoteTitle: { color: '#d9f0e4', fontSize: 13, fontWeight: '700' },
+  privacyNoteBody: { color: '#98b9aa', fontSize: 12, lineHeight: 18, marginTop: 4 },
+  clearDataButton: { flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 13, borderColor: '#553b43', borderWidth: 1, backgroundColor: '#2b202b', padding: 13, marginBottom: 12 },
+  clearDataGlyph: { color: '#e58c87', fontSize: 16 },
+  clearDataText: { color: '#ecc4bf', fontSize: 13, fontWeight: '700' },
+  pressed: { opacity: 0.72 },
+  web: { flex: 1, backgroundColor: '#ffffff' },
 });

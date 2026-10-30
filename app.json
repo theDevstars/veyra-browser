@@ -3,21 +3,47 @@
     "name": "Veyra Browser",
     "slug": "veyra-browser",
     "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
     "icon": "./assets/icon.png",
-    "orientation": "default",
-    "userInterfaceStyle": "dark",
-    "scheme": "veyra",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.thedevstars.veyra",
       "buildNumber": "1",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "Choose a wallpaper for Veyra Browser."
+        "CFBundleDisplayName": "Veyra Browser",
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLName": "com.thedevstars.veyra.browser",
+            "CFBundleURLSchemes": [
+              "http",
+              "https"
+            ]
+          }
+        ]
       }
     },
     "android": {
       "package": "com.thedevstars.veyra",
-      "versionCode": 1
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "http"
+            },
+            {
+              "scheme": "https"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
+      "versionCode": 1,
+      "label": "Veyra Browser"
     },
     "plugins": [
       [

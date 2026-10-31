@@ -42,6 +42,7 @@ const DEFAULT_SETTINGS = {
   showPrivacySnapshot: true,
   showBrandTagline: true,
   compactHome: false,
+  veloMode: false,
   showDockLabels: true,
   showHeader: true,
   showSearchBar: false,
@@ -668,6 +669,28 @@ export default function App() {
 
   const renderHome = () => (
     <ScrollView style={[styles.homeScroll, { backgroundColor: palette.bg }]} contentContainerStyle={[styles.homeContent, settings.compactHome && styles.homeContentCompact]} keyboardShouldPersistTaps="handled">
+      {settings.veloMode && <View style={styles.veloSearchWrap}>
+        <View style={[styles.safariAddressBar, styles.veloSearchBar, { backgroundColor: palette.surfaceAlt, borderColor: palette.border }]}>
+          <Text style={styles.safariLock}>⌕</Text>
+          <TextInput
+            value={address}
+            onChangeText={setAddress}
+            onSubmitEditing={() => navigate()}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType={Platform.OS === 'ios' ? 'web-search' : 'default'}
+            returnKeyType="search"
+            selectTextOnFocus
+            placeholder="Search or enter website"
+            placeholderTextColor={palette.muted}
+            style={[styles.safariAddressInput, { color: palette.text }]}
+            accessibilityLabel="Search or enter a website"
+          />
+          <Pressable onPress={() => navigate()} style={styles.safariReload} accessibilityRole="button" accessibilityLabel="Search">
+            <Text style={[styles.safariReloadGlyph, { color: palette.accent }]}>→</Text>
+          </Pressable>
+        </View>
+      </View>}
       {settings.showWelcome !== false && <View style={styles.welcomeBlock}>
         <Text style={styles.eyebrow}>YOUR SPACE ON THE WEB</Text>
         <Text style={[styles.welcomeTitle, settings.compactHome && styles.welcomeTitleCompact]}>A little light{ '\n' }for the way ahead.</Text>
@@ -825,7 +848,7 @@ export default function App() {
         />
       ) : renderHome()}
 
-      {settings.showDock !== false ? <View style={[styles.bottomDock, url ? styles.bottomDockBrowsing : styles.bottomDockHome]} accessibilityLabel="Browser dock">
+      {settings.showDock !== false && (!settings.veloMode || !!url) ? <View style={[styles.bottomDock, url ? styles.bottomDockBrowsing : styles.bottomDockHome]} accessibilityLabel="Browser dock">
         <Pressable onPress={goHome} style={({ pressed }) => [styles.dockItem, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Home">
           <Text style={styles.dockGlyph}>⌂</Text>
         </Pressable>
@@ -883,7 +906,7 @@ export default function App() {
         <Pressable onPress={() => setSettingsVisible(true)} style={({ pressed }) => [styles.dockItem, styles.dockIconTile, { backgroundColor: isLight ? '#e5ebff' : '#26354d' }, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Settings">
           <Text style={[styles.dockGlyph, styles.settingsDockGlyph, { color: isLight ? '#328052' : '#9bd5b2', fontSize: 22 }]}>⚙</Text>{!url && settings.showDockLabels !== false && <Text style={[styles.dockLabel, { color: palette.muted }]}>Settings</Text>}
         </Pressable>
-      </View> : <Pressable onPress={() => setSettingsVisible(true)} style={styles.hiddenSettingsButton} accessibilityRole="button" accessibilityLabel="Open Settings"><Text style={styles.dockGlyph}>⚙</Text></Pressable>}
+      </View> : ((!url && settings.veloMode) || settings.showDock === false) ? <Pressable onPress={() => setSettingsVisible(true)} style={styles.hiddenSettingsButton} accessibilityRole="button" accessibilityLabel="Open Settings"><Text style={styles.dockGlyph}>⚙</Text></Pressable> : null}
 
       <Modal visible={bookmarksVisible} animationType="slide" transparent onRequestClose={() => setBookmarksVisible(false)}>
         <View style={[styles.modalBackdrop, { backgroundColor: isLight ? 'rgba(25,35,55,0.28)' : 'rgba(3,8,17,0.7)' }]}>
@@ -1058,6 +1081,8 @@ export default function App() {
               <Text style={[styles.settingsSectionTitle, { color: palette.accent }]}>Appearance & layout</Text>
               <Text style={[styles.settingsIntro, { color: palette.muted }]}>Tune the start page and bottom dock. Your choices are saved on this device.</Text>
               <View style={[styles.settingsCard, { backgroundColor: palette.surfaceAlt, borderColor: palette.border }]}>
+                <SettingRow title="Velo mode" detail="Center the start-page search bar and show the browser dock only while a webpage is open." value={!!settings.veloMode} light={isLight} onValueChange={(value) => updateSetting('veloMode', value)} />
+                <View style={styles.settingDivider} />
                 <SettingRow title="Compact start page" detail="Use a tighter home-screen layout with a smaller welcome heading." value={!!settings.compactHome} light={isLight} onValueChange={(value) => updateSetting('compactHome', value)} />
                 <View style={styles.settingDivider} />
                 <SettingRow title="Show browser tagline" detail="Show or hide the text beneath the Veyra name." value={settings.showBrandTagline !== false} light={isLight} onValueChange={(value) => updateSetting('showBrandTagline', value)} />
@@ -1301,6 +1326,8 @@ const styles = StyleSheet.create({
   bottomDockBrowsing: { marginHorizontal: 12, paddingHorizontal: 7, gap: 5 },
   bottomDockHome: { marginHorizontal: 14, marginTop: 10, marginBottom: Platform.OS === 'ios' ? 12 : 14, paddingHorizontal: 12, paddingVertical: 12, minHeight: 76, gap: 8, borderRadius: 26 },
   homeDockSearch: { flex: 1, minWidth: 0, height: 48, borderRadius: 18, paddingLeft: 12, paddingRight: 5 },
+  veloSearchWrap: { minHeight: 150, justifyContent: 'center', paddingHorizontal: 8, marginTop: 4, marginBottom: 12 },
+  veloSearchBar: { width: '100%', height: 54, borderRadius: 20, paddingLeft: 15, paddingRight: 7 },
   safariAddressBar: { flex: 1, minWidth: 0, height: 42, flexDirection: 'row', alignItems: 'center', backgroundColor: '#0d1728', borderWidth: 1, borderColor: '#3b4961', borderRadius: 15, paddingLeft: 10, paddingRight: 4, gap: 5 },
   safariLock: { color: '#8bd1b1', fontSize: 17 },
   safariAddressInput: { flex: 1, minWidth: 0, paddingVertical: 4, color: '#f3f5f8', fontSize: 13 },
